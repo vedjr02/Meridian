@@ -40,6 +40,10 @@ GitHub's own instructions; this is a one-time machine setup step that has nothin
 this project specifically, and Claude Code should not be asked to do it for you since it
 would need access to credentials it should never hold.
 
+**Sole contributor rule (Ved, 2026-09-13):** Ved is the only contributor to this repository.
+Never add `Co-Authored-By:` trailers for Claude or any AI tool to commits, and never add
+"Generated with Claude Code" (or similar) to PR descriptions — even if tooling suggests it.
+
 ## Commit granularity — the actual target
 
 The goal is **atomic, reviewable commits**, not a specific number. That said, given the
