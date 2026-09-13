@@ -71,6 +71,23 @@ function edgePath(
   return `M ${source.x} ${y1} C ${source.x} ${peak}, ${target.x} ${peak}, ${target.x} ${y2}`;
 }
 
+type Bounds = { minX: number; minY: number; width: number; height: number };
+
+/**
+ * Initial view: zoomed so the map fills the canvas height, anchored at the left where the process
+ * starts. Why not "fit everything": the mined model is far wider than tall, so fitting its width
+ * leaves most of the canvas empty and shrinks labels to about 6 px, which nobody can read. Filling
+ * the height keeps labels legible; "Whole map" is one click away for the overview.
+ */
+function readableView(svg: SVGSVGElement, bounds: Bounds): View {
+  const { width, height } = svg.getBoundingClientRect();
+  if (width === 0 || height === 0) return IDENTITY;
+  const fit = Math.min(width / bounds.width, height / bounds.height);
+  const k = Math.min(MAX_ZOOM, Math.max(1, height / (bounds.height * fit)));
+  const centreY = bounds.minY + bounds.height / 2;
+  return { k, x: bounds.minX * (1 - k), y: centreY * (1 - k) };
+}
+
 /** Zoom by `factor` keeping the SVG point (px, py) fixed on screen, within the zoom limits. */
 function zoomAt(current: View, factor: number, px: number, py: number): View {
   const k = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, current.k * factor));
@@ -100,6 +117,8 @@ function edgeTitle(edge: ProcessMapEdge): string {
 export default function ProcessMap({ map, highlight }: ProcessMapProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const dragRef = useRef<{ pointerX: number; pointerY: number; view: View } | null>(null);
+  // Once the user pans or zooms, resizing the window must not snap the map back.
+  const userMovedRef = useRef(false);
   const [view, setView] = useState<View>(IDENTITY);
 
   const nodesById = useMemo(() => new Map(map.nodes.map((node) => [node.id, node])), [map.nodes]);
@@ -107,7 +126,7 @@ export default function ProcessMap({ map, highlight }: ProcessMapProps) {
     () => Math.max(1, ...map.edges.map((edge) => edge.frequency)),
     [map.edges],
   );
-  const bounds = useMemo(() => {
+  const bounds = useMemo<Bounds>(() => {
     const xs = map.nodes.map((node) => node.x);
     const ys = map.nodes.map((node) => node.y);
     const minX = Math.min(...xs) - NODE_WIDTH / 2 - PADDING;
@@ -116,6 +135,18 @@ export default function ProcessMap({ map, highlight }: ProcessMapProps) {
     const maxY = Math.max(...ys) + NODE_HEIGHT / 2 + PADDING;
     return { minX, minY, width: maxX - minX, height: maxY - minY };
   }, [map.nodes]);
+
+  // Apply the readable initial view once the canvas has a size, and again on resize until the
+  // user takes over.
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const observer = new ResizeObserver(() => {
+      if (!userMovedRef.current) setView(readableView(svg, bounds));
+    });
+    observer.observe(svg);
+    return () => observer.disconnect();
+  }, [bounds]);
 
   const highlighted = useMemo(() => {
     if (!highlight) return null;
@@ -143,6 +174,7 @@ export default function ProcessMap({ map, highlight }: ProcessMapProps) {
     if (!svg) return;
     const onWheel = (event: WheelEvent) => {
       event.preventDefault();
+      userMovedRef.current = true;
       const matrix = svg.getScreenCTM();
       if (!matrix) return;
       const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
@@ -154,6 +186,7 @@ export default function ProcessMap({ map, highlight }: ProcessMapProps) {
   }, []);
 
   function onPointerDown(event: PointerEvent<SVGSVGElement>) {
+    userMovedRef.current = true;
     event.currentTarget.setPointerCapture(event.pointerId);
     const point = toSvgPoint(event.clientX, event.clientY);
     dragRef.current = { pointerX: point.x, pointerY: point.y, view };
@@ -177,6 +210,16 @@ export default function ProcessMap({ map, highlight }: ProcessMapProps) {
   const centreX = bounds.minX + bounds.width / 2;
   const centreY = bounds.minY + bounds.height / 2;
 
+  /** Apply a view chosen by the user, which stops automatic resizing from overriding it. */
+  function userView(next: View | ((current: View) => View)) {
+    userMovedRef.current = true;
+    setView(next);
+  }
+
+  function showReadable() {
+    if (svgRef.current) userView(readableView(svgRef.current, bounds));
+  }
+
   function onKeyDown(event: KeyboardEvent<SVGSVGElement>) {
     const moves: Record<string, [number, number]> = {
       ArrowLeft: [PAN_STEP, 0],
@@ -186,13 +229,13 @@ export default function ProcessMap({ map, highlight }: ProcessMapProps) {
     };
     if (event.key in moves) {
       const [dx, dy] = moves[event.key];
-      setView((current) => ({ ...current, x: current.x + dx, y: current.y + dy }));
+      userView((current) => ({ ...current, x: current.x + dx, y: current.y + dy }));
     } else if (event.key === "+" || event.key === "=") {
-      setView((current) => zoomAt(current, 1.25, centreX, centreY));
+      userView((current) => zoomAt(current, 1.25, centreX, centreY));
     } else if (event.key === "-") {
-      setView((current) => zoomAt(current, 0.8, centreX, centreY));
+      userView((current) => zoomAt(current, 0.8, centreX, centreY));
     } else if (event.key === "0") {
-      setView(IDENTITY);
+      userView(IDENTITY);
     } else {
       return;
     }
@@ -203,15 +246,19 @@ export default function ProcessMap({ map, highlight }: ProcessMapProps) {
     <div className={styles.mapFrame}>
       <div className={styles.mapToolbar}>
         <div className={styles.mapButtons}>
-          <button type="button" onClick={() => setView((v) => zoomAt(v, 1.25, centreX, centreY))}>
+          <button type="button" onClick={() => userView((v) => zoomAt(v, 1.25, centreX, centreY))}>
             Zoom in
           </button>
-          <button type="button" onClick={() => setView((v) => zoomAt(v, 0.8, centreX, centreY))}>
+          <button type="button" onClick={() => userView((v) => zoomAt(v, 0.8, centreX, centreY))}>
             Zoom out
           </button>
-          <button type="button" onClick={() => setView(IDENTITY)}>
-            Fit
+          <button type="button" onClick={() => userView(IDENTITY)}>
+            Whole map
           </button>
+          <button type="button" onClick={showReadable}>
+            Readable size
+          </button>
+          <span className={styles.mapHint}>Drag to pan, scroll to zoom</span>
         </div>
         <ul className={styles.legend} aria-label="Edge styles">
           <li><span className={`${styles.legendLine} ${styles.legendCausal}`} aria-hidden="true" />causal</li>
@@ -222,8 +269,10 @@ export default function ProcessMap({ map, highlight }: ProcessMapProps) {
 
       {highlighted && highlighted.missing > 0 ? (
         <p className={styles.mapNote} role="note">
-          {highlighted.missing} of {highlighted.total} transitions in this variant are below the
-          miner&apos;s dependency threshold, so they are not drawn as edges.
+          {highlighted.missing} of {highlighted.total} transitions in this variant{" "}
+          {highlighted.missing === 1 ? "is" : "are"} below the miner&apos;s dependency threshold, so{" "}
+          {highlighted.missing === 1 ? "it is" : "they are"} not drawn as{" "}
+          {highlighted.missing === 1 ? "an edge" : "edges"}.
         </p>
       ) : null}
 
@@ -232,7 +281,7 @@ export default function ProcessMap({ map, highlight }: ProcessMapProps) {
         className={styles.mapCanvas}
         viewBox={`${bounds.minX} ${bounds.minY} ${bounds.width} ${bounds.height}`}
         role="img"
-        aria-label={`Process map with ${map.nodes.length} activities and ${map.edges.length} edges. Use arrow keys to pan, plus and minus to zoom, 0 to reset.`}
+        aria-label={`Process map with ${map.nodes.length} activities and ${map.edges.length} edges. Use arrow keys to pan, plus and minus to zoom, 0 to show the whole map.`}
         tabIndex={0}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}

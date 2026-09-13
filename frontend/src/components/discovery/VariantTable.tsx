@@ -27,7 +27,7 @@ function OutcomeMix({ variant }: { variant: Variant }) {
       {entries.map(([label, count]) => (
         <li key={label}>
           <span className={`${styles.swatch} ${OUTCOME_TONES[label] ?? styles.toneNeutral}`} aria-hidden="true" />
-          {label} {formatShare(count / variant.case_count)}
+          {label} {Math.round((count / variant.case_count) * 100)}%
         </li>
       ))}
     </ul>
