@@ -1,48 +1,23 @@
 """Module A acceptance: one command from raw log to map, model, variant table and summary."""
 
 import dataclasses
-import hashlib
 import json
 
 import pandas as pd
 import pytest
-from conftest import xes_event
 
-from meridian.config import DatasetSource, Settings, get_settings
+from meridian.config import Settings, get_settings
 from meridian.discovery import pipeline
 from meridian.discovery.pipeline import run_discovery
-
-TRACES = [
-    {
-        "case_id": case_id,
-        "events": [
-            xes_event(activity, "complete", f"2016-01-0{day}T{hour:02d}:00:00.000Z")
-            for hour, activity in enumerate(activities, start=9)
-        ],
-    }
-    for case_id, day, activities in [
-        ("c1", 1, ["Submit", "Review", "Approve"]),
-        ("c2", 2, ["Submit", "Review", "Approve"]),
-        ("c3", 3, ["Submit", "Reject"]),
-    ]
-]
 
 REAL_SETTINGS = get_settings()
 REAL_LOG = REAL_SETTINGS.raw_dir / REAL_SETTINGS.dataset.filename
 
 
 @pytest.fixture
-def settings(write_xes, tmp_path) -> Settings:
-    """Settings for a synthetic raw log served from a local file:// URL (no network, no DB)."""
-    source = write_xes(TRACES, gz=True, name="source")
-    dataset = DatasetSource(
-        name="Synthetic loan log",
-        url=source.as_uri(),
-        filename="source.xes.gz",
-        sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
-        outcome_activities=(("Approve", "approved"), ("Reject", "rejected")),
-    )
-    return dataclasses.replace(get_settings(), data_dir=tmp_path / "data", dataset=dataset)
+def settings(discovery_settings: Settings) -> Settings:
+    """The shared synthetic raw log from conftest (three cases, two variants)."""
+    return discovery_settings
 
 
 def test_one_command_produces_every_acceptance_output(settings) -> None:

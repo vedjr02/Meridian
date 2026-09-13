@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import dataclasses
 import gzip
+import hashlib
 from collections.abc import Callable, Iterator
 from html import escape
 from pathlib import Path
@@ -10,7 +12,7 @@ from pathlib import Path
 import psycopg
 import pytest
 
-from meridian.config import get_settings
+from meridian.config import DatasetSource, Settings, get_settings
 
 RAW_XML_KEY = "__xml__"
 
@@ -90,6 +92,40 @@ def write_xes(tmp_path: Path) -> Callable[..., Path]:
         return path
 
     return write
+
+
+DISCOVERY_TRACES = [
+    {
+        "case_id": case_id,
+        "events": [
+            xes_event(activity, "complete", f"2016-01-0{day}T{hour:02d}:00:00.000Z")
+            for hour, activity in enumerate(activities, start=9)
+        ],
+    }
+    for case_id, day, activities in [
+        ("c1", 1, ["Submit", "Review", "Approve"]),
+        ("c2", 2, ["Submit", "Review", "Approve"]),
+        ("c3", 3, ["Submit", "Reject"]),
+    ]
+]
+
+
+@pytest.fixture
+def discovery_settings(write_xes, tmp_path: Path) -> Settings:
+    """Settings for a small synthetic raw log served from a local file:// URL.
+
+    Three cases in two variants (Submit, Review, Approve twice; Submit, Reject once), with
+    outcomes, so discovery and API tests exercise every output without network or a database.
+    """
+    source = write_xes(DISCOVERY_TRACES, gz=True, name="source")
+    dataset = DatasetSource(
+        name="Synthetic loan log",
+        url=source.as_uri(),
+        filename="source.xes.gz",
+        sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
+        outcome_activities=(("Approve", "approved"), ("Reject", "rejected")),
+    )
+    return dataclasses.replace(get_settings(), data_dir=tmp_path / "data", dataset=dataset)
 
 
 def _drop_meridian_tables(conn: psycopg.Connection) -> None:
