@@ -35,6 +35,11 @@ brew install postgresql@18 && brew services start postgresql@18
 .venv/bin/python -m meridian.discovery.dfg                # directly-follows graph -> dfg_edges.csv
 .venv/bin/python -m meridian.discovery.heuristic_miner    # mined model -> heuristic_net.json
 
+# Diagnosis (Module B): conformance against a reference model, bottlenecks, rework, written report.
+# The reference strategy must be named; there is deliberately no default.
+.venv/bin/python -m meridian.conformance --reference most_frequent_variant
+.venv/bin/python -m meridian.conformance --reference most_frequent_variant_for_outcome --outcome pending
+
 # Tests: fast suite (what the pre-commit hook runs), then everything incl. real-data tests
 .venv/bin/pytest -m "not integration"
 .venv/bin/pytest
@@ -82,6 +87,10 @@ All settings live in `backend/meridian/config.py` and can be overridden by envir
 | `data/processed/variants.csv` | Every variant with case count, share and cumulative share |
 | `data/processed/case_statistics.csv` | Per case: cycle time, activity count, variant rank, happy-path flag, outcome |
 | `data/processed/discovery_summary.md` | Written Module A summary: variant headline, cycle-time p50/p90/p99, map, loops, caveats |
+| `data/processed/conformance_cases.csv`, `conformance_summary.json` | Token-replay counts and fitness per case; reference used and aggregates |
+| `data/processed/bottlenecks.csv` | Per-transition wait distribution, total time and classification |
+| `data/processed/rework_cases.csv`, `rework_activities.csv` | Rework per case and per repeated activity |
+| `data/processed/diagnostic_report.md` | Written Module B report: % deviating, costliest transition, rework time, evidence, caveats |
 | PostgreSQL `event_log`, `ingestion_run` | Normalized log, and one audit row per ingestion run |
 
 ## Data
