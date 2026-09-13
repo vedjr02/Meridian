@@ -1,0 +1,171 @@
+"""Module B conformance run: replay every case against a stated reference model and write results.
+
+`python -m meridian.conformance --reference <strategy>` requires the reference strategy to be named.
+Why there is no default: which reference model to use is an open decision (08-OPEN-QUESTIONS.md),
+and it changes every conformance number, so a run must always say what it measured against.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+import pandas as pd
+
+from meridian.config import Settings, get_settings
+from meridian.conformance.reference import (
+    ReferenceModel,
+    ReferenceStrategy,
+    select_reference_model,
+)
+from meridian.conformance.replay import FITNESS, LogReplay, replay_log
+from meridian.discovery.pipeline import lifecycle_description
+from meridian.discovery.summary import NO_OUTCOME
+from meridian.ingestion import schema
+from meridian.ingestion.io import read_event_log_csv
+
+FITNESS_FORMULA = "0.5 * (1 - missing / consumed) + 0.5 * (1 - remaining / produced)"
+
+
+@dataclass(frozen=True)
+class ConformanceResult:
+    """What one conformance run produced: the reference used, the replay, and output paths."""
+
+    reference: ReferenceModel
+    replay: LogReplay
+    summary: dict[str, Any]
+    outputs: dict[str, Path]
+
+
+def _fitness_by_outcome(event_log: pd.DataFrame, replay: LogReplay) -> dict[str, float]:
+    """Mean case fitness per outcome, so a reader can see which kind of case the reference suits.
+
+    Why this is reported: on BPI 2017 it is what exposes a misleading reference. If successful
+    cases fit worst, the "intended path" is not an intended path.
+    """
+    outcomes = (
+        event_log.drop_duplicates(schema.CASE_ID)
+        .set_index(schema.CASE_ID)[schema.OUTCOME]
+        .astype("object")
+    )
+    labels = replay.cases[schema.CASE_ID].map(outcomes)
+    labels = labels.where(labels.notna(), NO_OUTCOME)
+    means = replay.cases[FITNESS].groupby(labels).mean()
+    return {str(label): float(value) for label, value in sorted(means.items())}
+
+
+def run_conformance(
+    settings: Settings,
+    strategy: ReferenceStrategy,
+    *,
+    outcome: str | None = None,
+    documented_activities: list[str] | None = None,
+) -> ConformanceResult:
+    """Select the reference model, replay the normalized log against it, and write both outputs.
+
+    Reads the event log written by ingestion; run `python -m meridian.discovery` (or ingestion)
+    first. The summary records the reference's strategy, description and activities alongside the
+    lifecycle filter of the data, so the numbers can never be separated from what they measure.
+    """
+    if not settings.event_log_csv.exists():
+        raise FileNotFoundError(
+            f"No normalized event log at {settings.event_log_csv}; "
+            "run `python -m meridian.discovery` first."
+        )
+    event_log = read_event_log_csv(settings.event_log_csv)
+    reference = select_reference_model(
+        event_log, strategy, outcome=outcome, documented_activities=documented_activities
+    )
+    replay = replay_log(event_log, reference.net)
+
+    summary = {
+        "reference": {
+            "strategy": reference.strategy.value,
+            "outcome": outcome,
+            "description": reference.description,
+            "activities": list(reference.activities),
+            "supporting_cases": reference.supporting_cases,
+            "eligible_cases": reference.eligible_cases,
+        },
+        "lifecycle_kept": lifecycle_description(settings),
+        "fitness_formula": FITNESS_FORMULA,
+        "case_count": replay.case_count,
+        "fitting_cases": replay.fitting_cases,
+        "deviating_share": replay.deviating_share,
+        "log_fitness": replay.log_fitness,
+        "case_fitness": replay.case_fitness_summary(),
+        "mean_case_fitness_by_outcome": _fitness_by_outcome(event_log, replay),
+    }
+
+    settings.processed_dir.mkdir(parents=True, exist_ok=True)
+    replay.cases.to_csv(settings.conformance_cases_csv, index=False)
+    settings.conformance_summary_json.write_text(json.dumps(summary, indent=2) + "\n")
+    return ConformanceResult(
+        reference=reference,
+        replay=replay,
+        summary=summary,
+        outputs={
+            "Per-case replay": settings.conformance_cases_csv,
+            "Summary": settings.conformance_summary_json,
+        },
+    )
+
+
+def format_result(result: ConformanceResult) -> str:
+    """Render the reference used and the headline conformance numbers for the terminal."""
+    summary = result.summary
+    fitness = summary["case_fitness"]
+    by_outcome = ", ".join(
+        f"{label} {value:.3f}" for label, value in summary["mean_case_fitness_by_outcome"].items()
+    )
+    lines = [
+        f"Reference ({summary['reference']['strategy']}): {summary['reference']['description']}",
+        f"Cases fitting exactly: {summary['fitting_cases']:,} of {summary['case_count']:,} "
+        f"({summary['deviating_share']:.1%} deviate)",
+        f"Log fitness: {summary['log_fitness']:.3f}   Case fitness p10 {fitness['p10']:.3f}, "
+        f"p50 {fitness['p50']:.3f}, p90 {fitness['p90']:.3f} (mean {fitness['mean']:.3f})",
+        f"Mean case fitness by outcome: {by_outcome}",
+        "Outputs:",
+    ]
+    lines += [f"  {label}: {path}" for label, path in result.outputs.items()]
+    return "\n".join(lines)
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Command-line entry point: `python -m meridian.conformance --reference STRATEGY [...]`.
+
+    Why selection errors return exit code 1 with the message rather than a traceback: an unknown
+    outcome or a missing flag is a usage problem the message fully explains.
+    """
+    parser = argparse.ArgumentParser(description="Token-replay conformance against a reference.")
+    parser.add_argument(
+        "--reference",
+        required=True,
+        choices=[strategy.value for strategy in ReferenceStrategy],
+        help="how to choose the reference model; there is deliberately no default",
+    )
+    parser.add_argument("--outcome", help="outcome for most_frequent_variant_for_outcome")
+    parser.add_argument(
+        "--documented-activity",
+        action="append",
+        dest="documented_activities",
+        help="one activity of a documented reference, in order; repeat for each (documented only)",
+    )
+    args = parser.parse_args(argv)
+
+    try:
+        result = run_conformance(
+            get_settings(),
+            ReferenceStrategy(args.reference),
+            outcome=args.outcome,
+            documented_activities=args.documented_activities,
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"Conformance run failed: {exc}", file=sys.stderr)
+        return 1
+    print(format_result(result))
+    return 0
