@@ -1,8 +1,10 @@
-"""Module B conformance run: replay every case against a stated reference model and write results.
+"""Module B in one command: conformance, bottlenecks, rework and the written diagnostic report.
 
 `python -m meridian.conformance --reference <strategy>` requires the reference strategy to be named.
 Why there is no default: which reference model to use is an open decision (08-OPEN-QUESTIONS.md),
 and it changes every conformance number, so a run must always say what it measured against.
+Bottleneck and rework analysis do not depend on the reference and run in the same command so the
+report is complete.
 """
 
 from __future__ import annotations
@@ -17,14 +19,17 @@ from typing import Any
 import pandas as pd
 
 from meridian.config import Settings, get_settings
+from meridian.conformance.bottlenecks import BottleneckAnalysis, analyze_bottlenecks
 from meridian.conformance.reference import (
     ReferenceModel,
     ReferenceStrategy,
     select_reference_model,
 )
 from meridian.conformance.replay import FITNESS, LogReplay, replay_log
+from meridian.conformance.report import DiagnosticInputs, render_diagnostic_report
+from meridian.conformance.rework import ReworkAnalysis, analyze_rework
 from meridian.discovery.pipeline import lifecycle_description
-from meridian.discovery.summary import NO_OUTCOME
+from meridian.discovery.summary import NO_OUTCOME, format_duration
 from meridian.ingestion import schema
 from meridian.ingestion.io import read_event_log_csv
 
@@ -39,6 +44,27 @@ class ConformanceResult:
     replay: LogReplay
     summary: dict[str, Any]
     outputs: dict[str, Path]
+
+
+@dataclass(frozen=True)
+class DiagnosisResult:
+    """The full Module B run: conformance, bottlenecks, rework, the report text and all outputs."""
+
+    conformance: ConformanceResult
+    bottlenecks: BottleneckAnalysis
+    rework: ReworkAnalysis
+    report: str
+    outputs: dict[str, Path]
+
+
+def _load_event_log(settings: Settings) -> pd.DataFrame:
+    """Read the normalized event log, or explain which command produces it."""
+    if not settings.event_log_csv.exists():
+        raise FileNotFoundError(
+            f"No normalized event log at {settings.event_log_csv}; "
+            "run `python -m meridian.discovery` first."
+        )
+    return read_event_log_csv(settings.event_log_csv)
 
 
 def _fitness_by_outcome(event_log: pd.DataFrame, replay: LogReplay) -> dict[str, float]:
@@ -64,23 +90,19 @@ def run_conformance(
     *,
     outcome: str | None = None,
     documented_activities: list[str] | None = None,
+    event_log: pd.DataFrame | None = None,
 ) -> ConformanceResult:
     """Select the reference model, replay the normalized log against it, and write both outputs.
 
-    Reads the event log written by ingestion; run `python -m meridian.discovery` (or ingestion)
-    first. The summary records the reference's strategy, description and activities alongside the
+    The summary records the reference's strategy, description and activities alongside the
     lifecycle filter of the data, so the numbers can never be separated from what they measure.
+    `event_log` lets a caller that already loaded the log avoid reading it twice.
     """
-    if not settings.event_log_csv.exists():
-        raise FileNotFoundError(
-            f"No normalized event log at {settings.event_log_csv}; "
-            "run `python -m meridian.discovery` first."
-        )
-    event_log = read_event_log_csv(settings.event_log_csv)
+    log = _load_event_log(settings) if event_log is None else event_log
     reference = select_reference_model(
-        event_log, strategy, outcome=outcome, documented_activities=documented_activities
+        log, strategy, outcome=outcome, documented_activities=documented_activities
     )
-    replay = replay_log(event_log, reference.net)
+    replay = replay_log(log, reference.net)
 
     summary = {
         "reference": {
@@ -98,7 +120,7 @@ def run_conformance(
         "deviating_share": replay.deviating_share,
         "log_fitness": replay.log_fitness,
         "case_fitness": replay.case_fitness_summary(),
-        "mean_case_fitness_by_outcome": _fitness_by_outcome(event_log, replay),
+        "mean_case_fitness_by_outcome": _fitness_by_outcome(log, replay),
     }
 
     settings.processed_dir.mkdir(parents=True, exist_ok=True)
@@ -110,25 +132,78 @@ def run_conformance(
         summary=summary,
         outputs={
             "Per-case replay": settings.conformance_cases_csv,
-            "Summary": settings.conformance_summary_json,
+            "Conformance summary": settings.conformance_summary_json,
         },
     )
 
 
-def format_result(result: ConformanceResult) -> str:
-    """Render the reference used and the headline conformance numbers for the terminal."""
-    summary = result.summary
-    fitness = summary["case_fitness"]
-    by_outcome = ", ".join(
-        f"{label} {value:.3f}" for label, value in summary["mean_case_fitness_by_outcome"].items()
+def run_diagnosis(
+    settings: Settings,
+    strategy: ReferenceStrategy,
+    *,
+    outcome: str | None = None,
+    documented_activities: list[str] | None = None,
+) -> DiagnosisResult:
+    """Run every Module B analysis on the normalized log and write tables plus the written report.
+
+    The log is read once and shared, so conformance, bottlenecks and rework are guaranteed to
+    describe exactly the same events.
+    """
+    event_log = _load_event_log(settings)
+    conformance = run_conformance(
+        settings,
+        strategy,
+        outcome=outcome,
+        documented_activities=documented_activities,
+        event_log=event_log,
     )
+    bottlenecks = analyze_bottlenecks(event_log)
+    rework = analyze_rework(event_log)
+    report = render_diagnostic_report(
+        DiagnosticInputs(
+            dataset_name=settings.dataset.name,
+            lifecycle_kept=lifecycle_description(settings),
+            conformance=conformance.summary,
+            bottlenecks=bottlenecks,
+            rework=rework,
+        )
+    )
+
+    bottlenecks.transitions.to_csv(settings.bottlenecks_csv, index=False)
+    rework.cases.to_csv(settings.rework_cases_csv, index=False)
+    rework.activities.to_csv(settings.rework_activities_csv, index=False)
+    settings.diagnostic_report_md.write_text(report)
+    return DiagnosisResult(
+        conformance=conformance,
+        bottlenecks=bottlenecks,
+        rework=rework,
+        report=report,
+        outputs=conformance.outputs
+        | {
+            "Bottlenecks": settings.bottlenecks_csv,
+            "Rework by case": settings.rework_cases_csv,
+            "Rework by activity": settings.rework_activities_csv,
+            "Diagnostic report": settings.diagnostic_report_md,
+        },
+    )
+
+
+def format_result(result: DiagnosisResult) -> str:
+    """Render the reference used and the three headline answers for the terminal."""
+    summary = result.conformance.summary
+    fitness = summary["case_fitness"]
+    top = result.bottlenecks.most_costly()
+    rework = result.rework
     lines = [
         f"Reference ({summary['reference']['strategy']}): {summary['reference']['description']}",
         f"Cases fitting exactly: {summary['fitting_cases']:,} of {summary['case_count']:,} "
         f"({summary['deviating_share']:.1%} deviate)",
         f"Log fitness: {summary['log_fitness']:.3f}   Case fitness p10 {fitness['p10']:.3f}, "
         f"p50 {fitness['p50']:.3f}, p90 {fitness['p90']:.3f} (mean {fitness['mean']:.3f})",
-        f"Mean case fitness by outcome: {by_outcome}",
+        f"Costliest transition: {top.source} -> {top.target}, "
+        f"{top.share_of_total_time:.1%} of elapsed time, median {format_duration(top.p50_seconds)}",
+        f"Rework: {rework.rework_time_share:.1%} of cycle time in "
+        f"{rework.cases_with_rework:,} cases",
         "Outputs:",
     ]
     lines += [f"  {label}: {path}" for label, path in result.outputs.items()]
@@ -141,7 +216,9 @@ def main(argv: list[str] | None = None) -> int:
     Why selection errors return exit code 1 with the message rather than a traceback: an unknown
     outcome or a missing flag is a usage problem the message fully explains.
     """
-    parser = argparse.ArgumentParser(description="Token-replay conformance against a reference.")
+    parser = argparse.ArgumentParser(
+        description="Module B diagnosis: conformance, bottlenecks, rework and written report."
+    )
     parser.add_argument(
         "--reference",
         required=True,
@@ -158,14 +235,14 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        result = run_conformance(
+        result = run_diagnosis(
             get_settings(),
             ReferenceStrategy(args.reference),
             outcome=args.outcome,
             documented_activities=args.documented_activities,
         )
     except (FileNotFoundError, ValueError) as exc:
-        print(f"Conformance run failed: {exc}", file=sys.stderr)
+        print(f"Diagnosis run failed: {exc}", file=sys.stderr)
         return 1
     print(format_result(result))
     return 0
