@@ -4,7 +4,8 @@ Process-mining analytics over a real event log (BPI Challenge 2017). Meridian re
 process actually runs, diagnoses where it breaks down, simulates fixes, and produces an
 executive business case with ROI shown as ranges.
 
-> Status: early build — ingestion done, process discovery in progress. See `07-PROGRESS-STATE.md`.
+> Status: early build — ingestion and process discovery (Module A) done on the command line;
+> frontend and later modules in progress. See `07-PROGRESS-STATE.md`.
 
 ## Quickstart (current state)
 
@@ -26,7 +27,11 @@ brew install postgresql@18 && brew services start postgresql@18
 # Ingest: parse the XES, normalize, write data/processed/, load PostgreSQL (~16 s)
 .venv/bin/python -m meridian.ingestion          # add --no-db to skip PostgreSQL
 
-# Process discovery (Module A), each step runnable on its own
+# Process discovery (Module A) in one command: ingests first if needed, then writes the
+# process map, mined model, variant table, per-case statistics and a written summary
+.venv/bin/python -m meridian.discovery                    # --reingest, --no-db available
+
+# ...or each step on its own
 .venv/bin/python -m meridian.discovery.dfg                # directly-follows graph -> dfg_edges.csv
 .venv/bin/python -m meridian.discovery.heuristic_miner    # mined model -> heuristic_net.json
 
@@ -72,6 +77,10 @@ All settings live in `backend/meridian/config.py` and can be overridden by envir
 | `data/processed/ingestion_report.json` | Counts kept, filtered and excluded, by reason |
 | `data/processed/dfg_edges.csv` | Directly-follows edges: frequency, case frequency, median and mean duration |
 | `data/processed/heuristic_net.json` | Mined model: start/end activities and edges tagged by the rule that admitted them |
+| `data/processed/dfg.mmd` | Mermaid process map of the most frequent directly-follows edges |
+| `data/processed/variants.csv` | Every variant with case count, share and cumulative share |
+| `data/processed/case_statistics.csv` | Per case: cycle time, activity count, variant rank, happy-path flag, outcome |
+| `data/processed/discovery_summary.md` | Written Module A summary: variant headline, cycle-time p50/p90/p99, map, loops, caveats |
 | PostgreSQL `event_log`, `ingestion_run` | Normalized log, and one audit row per ingestion run |
 
 ## Data
