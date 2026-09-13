@@ -7,7 +7,7 @@
 
 ## Current phase
 
-`Week 2, Day 10 — code done (full-log replay, aggregates, conformance command); the published real-data run waits for Ved's reference-model decision. Next: Week 2, Day 11 — bottleneck analysis (independent of the reference model).`
+`Week 2, Day 11 — done (bottleneck analysis). Next: Week 2, Day 12 — rework loop detection and its cycle-time cost. Published conformance run still waits for Ved's reference-model decision.`
 
 Active branch: `module-b-conformance`, created from `main` after Ved merged PR #3 (all of Module A
 is in `main`). Pushed. Never commit to `main` directly.
@@ -99,6 +99,13 @@ is in `main`). Pushed. Never commit to `main` directly.
 - [ ] **Waiting on Ved**: run the command into `data/processed/` with the chosen reference
 - [x] Day 10 checkpoint logged in `AUDIT-LOG.md` (222 tests, all green)
 
+## Day 11 checklist (session 3)
+
+- [x] `transition_occurrences(event_log)` extracted in `backend/meridian/discovery/dfg.py` (per-occurrence elapsed time, shared with `build_dfg`)
+- [x] `analyze_bottlenecks(event_log)` → `BottleneckAnalysis` (per transition: occurrences, cases, total and share of time, mean, Q1/p50/Q3/p90/p99/max, quartile dispersion, `kind`; `most_costly()`, `flagged(kind)`) — `backend/meridian/conformance/bottlenecks.py` — `tests/test_bottlenecks.py` (hand-computed, plus cycle-time reconciliation on synthetic and real data)
+- [x] Day 11 checkpoint logged in `AUDIT-LOG.md` (240 tests, all green)
+- [ ] Not yet: a bottleneck command/output file (planned with the Day 13 report generator)
+
 ## Real-data facts established (BPI 2017, measured session 2)
 
 - 31,509 cases, 1,202,267 events, 26 activities, 149 resources. Every event has case id, activity,
@@ -109,6 +116,7 @@ is in `main`). Pushed. Never commit to `main` directly.
 - Full ingestion takes ~16 s (parse ~11 s).
 - Variants (`complete`-only log): 5,623 distinct for 31,509 cases; 610 cover 80% of cases; top variant 7.0% of cases; 4,150 single-case variants. **Top 3 variants (5,704 cases) all end cancelled** (see 08-OPEN-QUESTIONS.md). Most common variant among `pending` cases is rank 4 (969 cases).
 - Cycle time (`complete`-only log): p50 19.1 d, p90 35.0 d, p99 59.1 d, mean 21.8 d, max 169.1 d. Most common variant p50 31.7 d against 17.9 d for all others.
+- Bottlenecks (`complete`-only log): costliest transition `A_Complete → A_Cancelled`, 31.9% of all elapsed case-time, median 30.7 d with quartiles 30.5–30.8 d (looks like a fixed cancellation window, i.e. policy rather than capacity); next `A_Complete → A_Validating`, 23.7%, median 7.2 d. Slow threshold 1.0 d. Kinds: 6 uniformly slow, 17 slow and variable, 38 high variance, 31 not flagged, 67 insufficient data.
 - Heuristic net (threshold 0.9, `complete`-only log): 98 edges — 83 causal, 5 length-one loops, 10 length-two-loop edges, 0 best connections; no orphans; mined in 0.3 s. `O_Create Offer ⇄ O_Created` is a length-two loop (multiple offers). Largest rework loop: `A_Incomplete ⇄ A_Validating` (12,282 / 4,427 transitions) — a Module B lead.
 - DFG (`complete`-only log): 443,797 transitions, 159 distinct edges, built in 0.7 s. All 31,509 cases start with `A_Create Application`. Top edge `O_Create Offer -> O_Created` (42,995). Early bottleneck signal for Module B: `A_Complete -> A_Validating` median 7.2 d, mean 8.9 d.
 - The raw XES is one line with no newlines — never grep or line-read it.
@@ -118,7 +126,7 @@ is in `main`). Pushed. Never commit to `main` directly.
 | Module | Status | Notes |
 |---|---|---|
 | A — Process Discovery | **Complete** (Week 1): command-line acceptance met, frontend `/discovery` built and verified | Awaiting PR for last 4 commits |
-| B — Conformance & Diagnosis | Days 8–10 code done (Petri net, reference selection, replay, conformance command) | Day 11 next: bottlenecks. Published conformance run waits for the reference decision. Real-data reference choice blocked on open question. Will need start/end pairing from `raw_events.csv` for processing vs. waiting time |
+| B — Conformance & Diagnosis | Days 8–11 done (Petri net, reference selection, replay, conformance command, bottlenecks) | Day 12 next: rework loops. Published conformance run waits for the reference decision. Real-data reference choice blocked on open question. Will need start/end pairing from `raw_events.csv` for processing vs. waiting time |
 | C — Automation Scoring | Not started | |
 | D — Business Case & ROI | Not started | |
 | E — Organizational Network | Not started | Resource data is complete. 5 resources (User_145–149) exist only in non-`complete` transitions |
@@ -160,6 +168,7 @@ Exact stopping point: pre-merge checkpoint passed and logged; working tree clean
 - 2026-09-13 — Optional `outcome` column filled from each case's last terminal application state (A_Pending/A_Denied/A_Cancelled → pending/denied/cancelled; NULL for 98 open cases). `cost` stays NULL: BPI 2017 has no per-event cost.
 - 2026-09-13 — Added `psycopg[binary]` (the driver for the PostgreSQL already in the tech stack) and an `ingestion_run` audit table (tech stack: Postgres stores "past decision/audit runs").
 - 2026-09-13 — Pre-commit runs every test except `integration` (real-data, ~16 s); integration tests run at each checkpoint.
+- 2026-09-13 — Bottleneck classification adds `slow_and_variable` (both flags) and `insufficient_data` (under 30 occurrences) beside the required "uniformly slow" and "high variance". Reason: a transition can genuinely be both, and classifying tiny samples would report noise as findings.
 - 2026-09-13 — The conformance summary adds mean case fitness per outcome. Reason: it is the evidence that shows whether a reference model is a sensible "intended path" (on BPI 2017 it exposed that the literal most-frequent variant rewards cancellations).
 - 2026-09-13 — Token-replay fitness is the standard two-term formula 0.5(1 − m/c) + 0.5(1 − r/p) (Rozinat and van der Aalst 2008), not the single ratio 02-TECH-STACK suggests (the spec asks for a justified choice). Reason: missing and remaining deviations are scored separately so neither dilutes the other, and results match the standard definition. Activities absent from the reference count as one missing plus one remaining token.
 - 2026-09-13 — Module B uses a formal labelled Petri net (places, transitions, markings) rather than the simplified "graph with required order" that 02-TECH-STACK also allows. Reason: missing/remaining tokens need places to refer to; restriction: no silent transitions.
