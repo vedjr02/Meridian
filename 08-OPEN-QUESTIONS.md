@@ -72,6 +72,26 @@ start with complete/ate_abort from `raw_events.csv` for processing times. The de
 until you decide, per "log it, don't unilaterally switch approaches".
 **Status**: open — needed before Day 5's real-data integration run
 
+## 2026-09-13 — Module A / B — The most common variant is a cancellation path
+
+**Question**: 01-REQUIREMENTS.md defines the "happy path" as the most common variant (Module A
+req. 4), and Module B req. 1 defaults its reference model to the most frequent variant. On BPI 2017
+(current `complete`-only log) the three most common variants, 5,704 cases, all end **cancelled**:
+offer created and sent, customer never returns it, application cancelled. The rank-1 variant
+(2,209 cases, 7.0%) has a median cycle time of 31.7 days against 17.9 days for all other cases.
+Should "happy path" and the Module B reference model stay "most frequent variant", or become
+"most frequent variant among successful cases" (outcome `pending`)? BPI 2017 publishes no
+documented intended process, so Module B's documented-model alternative is not available.
+**Why it's blocking (or what it's blocking)**: Not Module A — Day 6 implements the definition as
+written, and the generated summary states the rank-1 variant's outcome mix so nobody reads it as a
+success path. It blocks Module B (Day 8): conformance measured against a cancellation path would
+make "% of cases deviating from the intended path" mean the opposite of what it says.
+**Claude's best guess if forced to proceed anyway**: Keep requirement 4's literal definition for
+Module A's "happy path" statistics (clearly labelled "most common variant"), and for Module B use
+the most frequent variant among `pending` cases as the reference model, logging that choice.
+This also depends on the lifecycle question above, which changes the variants themselves.
+**Status**: open — needed before Day 8
+
 ## 2026-09-13 — Module A (infra) — Which BPI dataset, and repo setup
 
 **Question**: BPI 2012 vs. 2017; the build plan said to clone a repo already containing the
