@@ -117,9 +117,29 @@ class Settings:
         return self.processed_dir / "dfg_edges.csv"
 
     @property
+    def dfg_mermaid(self) -> Path:
+        """Mermaid flowchart of the most frequent DFG edges (renders on GitHub and in editors)."""
+        return self.processed_dir / "dfg.mmd"
+
+    @property
     def heuristic_net_json(self) -> Path:
         """The mined heuristic process model: start/end activities, causal and loop edges."""
         return self.processed_dir / "heuristic_net.json"
+
+    @property
+    def variants_csv(self) -> Path:
+        """Variant frequency table: every distinct path with case count and cumulative share."""
+        return self.processed_dir / "variants.csv"
+
+    @property
+    def case_statistics_csv(self) -> Path:
+        """Per-case cycle time, activity count, variant rank, happy-path flag and outcome."""
+        return self.processed_dir / "case_statistics.csv"
+
+    @property
+    def discovery_summary_md(self) -> Path:
+        """Written Module A summary: variants, cycle-time distribution, process map, caveats."""
+        return self.processed_dir / "discovery_summary.md"
 
     @property
     def ingestion_report_json(self) -> Path:
