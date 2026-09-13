@@ -73,11 +73,12 @@
   font-size: 18px;
 }
 
+/* The tinted ground and the "Caveat" tag carry the signal; no side accent bar. */
 .caveat {
   margin: 0;
   padding: var(--space-2) var(--space-4);
   background: var(--color-risk-medium-soft);
-  border-left: 3px solid var(--color-risk-medium);
+  border-radius: var(--radius);
   color: var(--color-text);
 }
 
