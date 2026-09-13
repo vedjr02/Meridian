@@ -10,15 +10,23 @@ raw events and cannot disagree with the DFG it is based on.
 
 from __future__ import annotations
 
+import argparse
+import json
+import sys
 from dataclasses import dataclass
 from enum import StrEnum
 
 import numpy as np
 import pandas as pd
 
-from meridian.config import DEFAULT_DEPENDENCY_THRESHOLD, validate_dependency_threshold
+from meridian.config import (
+    DEFAULT_DEPENDENCY_THRESHOLD,
+    get_settings,
+    validate_dependency_threshold,
+)
 from meridian.discovery.dfg import FREQUENCY, SOURCE, TARGET, DirectlyFollowsGraph, build_dfg
 from meridian.ingestion import schema
+from meridian.ingestion.io import read_event_log_csv
 
 DEPENDENCY = "dependency"
 CAUSAL_EDGE_COLUMNS = (SOURCE, TARGET, DEPENDENCY, FREQUENCY)
@@ -368,3 +376,82 @@ def _connect_all_activities(
             s == activity and s != t for s, t in admitted
         ):
             admit_strongest([c for c in observed if c[0] == activity])
+
+
+def format_summary(net: HeuristicNet) -> str:
+    """Render the mined model's shape and its non-causal edges as plain text.
+
+    Why loop and best-connection edges are listed one by one: they are the edges a reviewer should
+    question first. Loops point at rework, and best connections exist only for connectivity.
+    """
+    kinds = net.edges[KIND].value_counts()
+    rule_counts = ", ".join(
+        f"{kind} {int(kinds.get(kind, 0))}"
+        for kind in (CAUSAL, LENGTH_ONE_LOOP, LENGTH_TWO_LOOP, BEST_CONNECTION)
+    )
+    lines = [
+        f"Threshold: {net.threshold}   Cases: {net.case_count:,}   "
+        f"Activities: {len(net.activities)}   Edges: {len(net.edges)}",
+        f"Edges by rule: {rule_counts}",
+        f"Start activities: {net.start_activities}",
+        f"Orphan activities: {', '.join(net.orphan_activities) or 'none'}",
+    ]
+    special = net.edges[net.edges[KIND] != CAUSAL]
+    if not special.empty:
+        lines.append("Loop and connectivity edges:")
+        lines += [
+            f"  {edge.source} -> {edge.target} [{edge.kind}] "
+            f"measure {edge.dependency:.3f}, frequency {edge.frequency:,}"
+            for edge in special.itertuples()
+        ]
+    return "\n".join(lines)
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Command-line entry point: `python -m meridian.discovery.heuristic_miner [--threshold T]`.
+
+    Reads the normalized log written by ingestion, writes `heuristic_net.json`, and prints a
+    summary. The threshold defaults to the configured value so a run is reproducible from the
+    environment alone, and an explicit flag makes threshold experiments one command each.
+    """
+    settings = get_settings()
+    parser = argparse.ArgumentParser(description="Mine the heuristic process model (Module A).")
+    parser.add_argument(
+        "--threshold",
+        type=float,
+        default=settings.dependency_threshold,
+        help="dependency threshold strictly between 0 and 1 (default: configured value, 0.9)",
+    )
+    parser.add_argument(
+        "--no-connect-all",
+        action="store_true",
+        help="skip the all-activities-connected heuristic",
+    )
+    args = parser.parse_args(argv)
+
+    try:
+        validate_dependency_threshold(args.threshold)
+    except ValueError as exc:
+        print(exc, file=sys.stderr)
+        return 2
+    if not settings.event_log_csv.exists():
+        print(
+            f"No normalized event log at {settings.event_log_csv}; "
+            "run `python -m meridian.ingestion` first.",
+            file=sys.stderr,
+        )
+        return 1
+
+    net = mine_heuristic_net(
+        read_event_log_csv(settings.event_log_csv),
+        args.threshold,
+        connect_all=not args.no_connect_all,
+    )
+    settings.heuristic_net_json.write_text(json.dumps(net.to_dict(), indent=2) + "\n")
+    print(format_summary(net))
+    print(f"Model written to {settings.heuristic_net_json}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
