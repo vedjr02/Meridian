@@ -11,6 +11,7 @@ from meridian.discovery.variants import (
     VARIANT,
     VARIANT_COLUMNS,
     analyze_variants,
+    variants_needed,
 )
 
 # 10 cases in 4 variants: 5 / 3 / 1 / 1.
@@ -47,6 +48,12 @@ def test_coverage_share_outside_range_is_rejected(share: float) -> None:
     """A share of 0 or above 1 has no meaningful answer."""
     with pytest.raises(ValueError):
         ANALYSIS.variants_to_cover(share)
+
+
+def test_variants_needed_works_from_saved_counts_alone() -> None:
+    """The API answers from variants.csv; the standalone function must agree with the analysis."""
+    assert variants_needed([5, 3, 1, 1], 0.8) == ANALYSIS.variants_to_cover(0.8) == 2
+    assert variants_needed([], 0.8) == 0
 
 
 def test_each_case_is_mapped_to_its_variant_rank() -> None:

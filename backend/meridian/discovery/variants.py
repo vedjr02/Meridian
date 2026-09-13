@@ -61,13 +61,23 @@ class VariantAnalysis:
         up (80% of 31,509 cases is 25,207.2, so 25,208 cases must be covered) after trimming
         floating-point noise, so that 80% of 10 cases is exactly 8.
         """
-        if not 0 < share <= 1:
-            raise ValueError(f"Coverage share must be in (0, 1], got {share}")
-        if self.case_count == 0:
-            return 0
-        needed = math.ceil(round(share * self.case_count, 9))
-        cumulative = self.variants[CASE_COUNT].cumsum().to_numpy()
-        return int(np.searchsorted(cumulative, needed, side="left")) + 1
+        return variants_needed(self.variants[CASE_COUNT].tolist(), share)
+
+
+def variants_needed(case_counts: list[int], share: float = 0.8) -> int:
+    """Return how many of the most frequent variants cover at least `share` of all cases.
+
+    `case_counts` must be sorted from most to least frequent, as in the variant table; kept as a
+    standalone function so the API can answer from `variants.csv` without re-running the analysis.
+    """
+    if not 0 < share <= 1:
+        raise ValueError(f"Coverage share must be in (0, 1], got {share}")
+    total = sum(case_counts)
+    if total == 0:
+        return 0
+    needed = math.ceil(round(share * total, 9))
+    cumulative = np.cumsum(np.asarray(case_counts, dtype=np.int64))
+    return int(np.searchsorted(cumulative, needed, side="left")) + 1
 
 
 def analyze_variants(event_log: pd.DataFrame) -> VariantAnalysis:
