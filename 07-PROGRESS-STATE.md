@@ -7,7 +7,7 @@
 
 ## Current phase
 
-`Week 1, Day 3 — done. Next: Week 1, Day 4 — Heuristic Miner core (footprint matrix, dependency measure).`
+`Week 1, Day 4 — done. Next: Week 1, Day 5 — Heuristic Miner loop handling, full mined model, end-to-end real-data check.`
 
 Active branch: `module-a-discovery` (pushed, HEAD at end of session 2). `origin/main` already
 contains Day 1 via PR #1, merged by Ved on GitHub; local `main` has not been fast-forwarded (not
@@ -44,6 +44,13 @@ needed for branch work — never commit to `main` directly).
 - [x] Real-log invariants (integration) — `tests/test_dfg_cli.py`
 - [x] Day 3 checkpoint logged in `AUDIT-LOG.md` (74 tests, all green)
 
+## Day 4 checklist (session 2)
+
+- [x] Configurable dependency threshold — `DEFAULT_DEPENDENCY_THRESHOLD = 0.9` + `validate_dependency_threshold` in `backend/meridian/config.py`; env `MERIDIAN_DEPENDENCY_THRESHOLD`
+- [x] `backend/meridian/discovery/heuristic_miner.py`: `dependency_measure`, `classify_pair` → `Relation` (`->`, `<-`, `||`, `#`, `~`), `dependency_matrix`, `footprint_matrix`, `causal_edges`
+- [x] Tests with hand-computed expectations — `tests/test_heuristic_miner.py` (purpose-built `VARIANTS` log + the Day 3 log)
+- [x] Day 4 checkpoint logged in `AUDIT-LOG.md` (106 tests, all green)
+
 ## Real-data facts established (BPI 2017, measured session 2)
 
 - 31,509 cases, 1,202,267 events, 26 activities, 149 resources. Every event has case id, activity,
@@ -59,7 +66,7 @@ needed for branch work — never commit to `main` directly).
 
 | Module | Status | Notes |
 |---|---|---|
-| A — Process Discovery | Days 1–3 done (infra, ingestion, DFG) | Day 4 next: heuristic miner core |
+| A — Process Discovery | Days 1–4 done (infra, ingestion, DFG, miner core) | Day 5 next: loops + full model |
 | B — Conformance & Diagnosis | Not started | Will need start/end pairing from `raw_events.csv` for processing vs. waiting time |
 | C — Automation Scoring | Not started | |
 | D — Business Case & ROI | Not started | |
@@ -69,21 +76,26 @@ needed for branch work — never commit to `main` directly).
 
 ## Last session summary
 
-**2026-09-13 (session 2)** — Completed Day 2 (ingestion) and Day 3 (DFG). All commits authored
-by Vedjr02 with no AI co-author trailers (see `05-GIT-WORKFLOW.md`).
+**2026-09-13 (session 2)** — Completed Day 2 (ingestion), Day 3 (DFG) and Day 4 (heuristic
+miner core). All commits authored by Vedjr02 with no AI co-author trailers (see
+`05-GIT-WORKFLOW.md`).
 
-Exact stopping point: Day 3 checkpoint passed and logged; working tree clean on
+Exact stopping point: Day 4 checkpoint passed and logged; working tree clean on
 `module-a-discovery`, pushed. Nothing mid-change.
 
-**Start Day 4 here:**
+**Start Day 5 here:**
 1. Check `08-OPEN-QUESTIONS.md`: the lifecycle question is still **open** (Claude recommends
-   option B). It does not block Day 4.
-2. Day 4 = Heuristic Miner core, hand-implemented (02-TECH-STACK-AND-SKILLS.md §1). Suggested
-   home: `backend/meridian/discovery/heuristic_miner.py`. Take |A>B| from
-   `DirectlyFollowsGraph.frequency(a, b)` — do not recount transitions.
-3. Dependency measure `(|A>B| - |B>A|) / (|A>B| + |B>A| + 1)`; classify pairs as causal /
-   parallel / unrelated; threshold configurable. Unit-test specific classifications on the Day 3
-   synthetic log (`tests/test_dfg.py::LOG`) plus any purpose-built logs.
+   option B). Day 5's loop logic is unaffected, but the real-data sanity check's numbers will
+   change once it is answered.
+2. Add to `backend/meridian/discovery/heuristic_miner.py`: length-one loops (A>A; measure
+   |A>A| / (|A>A| + 1)) and length-two loops (count the pattern A,B,A per 02-TECH-STACK §1 step 4;
+   measure (|A>>B| + |B>>A|) / (|A>>B| + |B>>A| + 1)). The A,B,A counts need the event sequences,
+   not only the DFG, so compute them once from the normalized log.
+3. Real motivating case: `O_Create Offer -> O_Created` is currently parallel (42,995 vs 3,913;
+   dependency 0.833), and all 3,913 reverse transitions are `O_Create Offer, O_Created,
+   O_Create Offer`. With length-two loop handling it should become causal plus a loop.
+4. Then the full model output (start activities, end activities, causal edges, loops) and the
+   end-to-end real-data integration test: no orphan nodes, start/end activities make sense.
 
 ## Scope decisions
 
@@ -96,6 +108,7 @@ Exact stopping point: Day 3 checkpoint passed and logged; working tree clean on
 - 2026-09-13 — Optional `outcome` column filled from each case's last terminal application state (A_Pending/A_Denied/A_Cancelled → pending/denied/cancelled; NULL for 98 open cases). `cost` stays NULL: BPI 2017 has no per-event cost.
 - 2026-09-13 — Added `psycopg[binary]` (the driver for the PostgreSQL already in the tech stack) and an `ingestion_run` audit table (tech stack: Postgres stores "past decision/audit runs").
 - 2026-09-13 — Pre-commit runs every test except `integration` (real-data, ~16 s); integration tests run at each checkpoint.
+- 2026-09-13 — Footprint relations add `INFREQUENT` (`~`) beside the spec's causal / parallel / unrelated. Reason: with a dependency threshold, a pair seen in one direction only but below the threshold fits none of the three (not causal, not parallel, not "never follow"); forcing it into one would either admit noise or misstate the log.
 - 2026-09-13 — DFG edges report `case_frequency` and median duration beside the required frequency and mean. Reason: median guards against skew (03-UIUX rule 1) and case frequency exposes rework; both are one aggregation each. Full distributions stay in Module B.
 
 ## Known issues / technical debt
