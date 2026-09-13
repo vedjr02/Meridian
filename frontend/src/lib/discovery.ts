@@ -17,7 +17,8 @@ export type DistributionSeconds = {
 
 export type Overview = {
   dataset: string;
-  lifecycle_kept: string;
+  /** Lifecycle rule ingestion recorded for this log; `policy` is null if no report exists. */
+  lifecycle: { policy: string | null; description: string; caveat: string };
   case_count: number;
   event_count: number;
   activity_count: number;
