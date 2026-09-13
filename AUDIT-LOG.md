@@ -4,6 +4,34 @@ Checkpoint entries per `06-AUDIT-PROTOCOL.md`. Newest first.
 
 ---
 
+## 2026-09-13 — Session 2 — End of Week 1 Day 6 checkpoint (branch `module-a-discovery`, HEAD `5ec012e`)
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Full test suite incl. integration | **Pass** — 167 passed in 46.9 s; all four real-data integration tests ran |
+| 2 | Linters/formatters (`ruff check`, `ruff format --check`, `eslint`) | **Pass** — all clean |
+| 3 | Requirements re-read: Module A req. 4–5 and the Module A acceptance criteria, Day 6 plan | Req. 4, per-case statistics (cycle time, activity count, happy-path match against the most common variant): **pass** — `case_statistics.csv`. Req. 5, variants, frequencies and the 80%-coverage count: **pass** — `variants.csv` and the summary headline. **Acceptance, verified by running the command**: `python -m meridian.discovery` from the raw log produces (a) the DFG visualization `dfg.mmd`, also embedded in the summary; (b) the mined model `heuristic_net.json`; (c) the variant table `variants.csv`; (d) the written summary `discovery_summary.md` with p50/p90/p99, not only the mean. **All four met**, and `tests/test_discovery_pipeline.py` covers them on synthetic and real logs. The interactive frontend view is Day 7. |
+| 4 | Scope drift | **Pass, documented** — Mermaid as the command-line visualization format; outcome mix per variant and the most common variant within each outcome added to the summary (prompted by the finding below); the single command pulled forward from Day 7. All logged in `07-PROGRESS-STATE.md`. |
+| 5 | Hand-implemented list / LLM rule | **Pass** — no pm4py, networkx or SimPy; no LLM SDK installed or imported. The summary is template-only, with a determinism test. |
+| 6 | Git authorship | **Pass** — 72 commits, all `Vedjr02`, 0 co-author trailers. |
+
+**Real-log results (`complete`-only log, threshold 0.9)**: 5,623 variants for 31,509 cases; 80%
+coverage needs 610 of them (10.8%); 4,150 variants (73.8%) occur once. Cycle time p50 19.1 d, p90
+35.0 d, p99 59.1 d, mean 21.8 d, max 169.1 d. **Finding raised to the human**: the three most common
+variants (5,704 cases) all end cancelled, so "most common variant" as happy path and as Module B's
+default reference model is questionable. Logged in `08-OPEN-QUESTIONS.md`.
+
+**Failed → fixed during this unit of work**
+- Test expectation error: variant ranks for tied single-case variants were [2, 3] where the
+  documented tie-break gives [3, 2]. The test was wrong, not the code; corrected with an explanatory comment.
+- Presentation: loop measures printed as "1.000" (false certainty; measures are below 1 by
+  construction), and "forward/back" did not name directions. Fixed in a separate `fix` commit with tests.
+- Preempted before commit: `Series.map(dict)` with tuple keys (a pandas MultiIndex conversion
+  hazard) replaced by a plain lookup.
+- Several E501 line-length failures; reworded or auto-wrapped.
+
+---
+
 ## 2026-09-13 — Session 2 — End of Week 1 Day 5 checkpoint (branch `module-a-discovery`, HEAD `0727a75`)
 
 | # | Check | Result |
