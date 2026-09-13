@@ -102,6 +102,11 @@ class Settings:
         return self.processed_dir / "event_log.csv"
 
     @property
+    def dfg_edges_csv(self) -> Path:
+        """Directly-follows graph edges: frequency and duration per activity-to-activity pair."""
+        return self.processed_dir / "dfg_edges.csv"
+
+    @property
     def ingestion_report_json(self) -> Path:
         """Accounting of the last ingestion run: counts kept, excluded and filtered, by reason."""
         return self.processed_dir / "ingestion_report.json"
