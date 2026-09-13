@@ -10,17 +10,26 @@ raw events and cannot disagree with the DFG it is based on.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import StrEnum
 
 import numpy as np
 import pandas as pd
 
 from meridian.config import DEFAULT_DEPENDENCY_THRESHOLD, validate_dependency_threshold
-from meridian.discovery.dfg import FREQUENCY, SOURCE, TARGET, DirectlyFollowsGraph
+from meridian.discovery.dfg import FREQUENCY, SOURCE, TARGET, DirectlyFollowsGraph, build_dfg
 from meridian.ingestion import schema
 
 DEPENDENCY = "dependency"
 CAUSAL_EDGE_COLUMNS = (SOURCE, TARGET, DEPENDENCY, FREQUENCY)
+
+# Which rule admitted an edge into the mined model (see `mine_heuristic_net`).
+KIND = "kind"
+CAUSAL = "causal"
+LENGTH_ONE_LOOP = "length_one_loop"
+LENGTH_TWO_LOOP = "length_two_loop"
+BEST_CONNECTION = "best_connection"
+MODEL_EDGE_COLUMNS = (SOURCE, TARGET, KIND, DEPENDENCY, FREQUENCY)
 
 
 class Relation(StrEnum):
@@ -205,3 +214,157 @@ def count_length_two_patterns(event_log: pd.DataFrame) -> dict[tuple[str, str], 
     pairs = pd.DataFrame({"a": activity[returns].to_numpy(), "b": middle[returns].to_numpy()})
     counts = pairs.groupby(["a", "b"]).size()
     return {(str(a), str(b)): int(count) for (a, b), count in counts.items()}
+
+
+@dataclass(frozen=True)
+class HeuristicNet:
+    """The mined process model: start activities, end activities and admitted edges.
+
+    Attributes:
+        activities: Event count per activity; the model's nodes.
+        start_activities: Number of cases starting with each activity.
+        end_activities: Number of cases ending with each activity.
+        edges: Columns `MODEL_EDGE_COLUMNS`, sorted by source then target. `kind` names the rule
+            that admitted the edge, and `dependency` holds that rule's measure: the pairwise
+            dependency for `causal` and `best_connection`, the self-loop measure for
+            `length_one_loop`, the return-pattern measure for `length_two_loop`.
+        threshold: Dependency threshold the model was mined with.
+        case_count: Number of cases in the log.
+    """
+
+    activities: dict[str, int]
+    start_activities: dict[str, int]
+    end_activities: dict[str, int]
+    edges: pd.DataFrame
+    threshold: float
+    case_count: int
+
+    @property
+    def orphan_activities(self) -> list[str]:
+        """Activities with no edge to or from another activity (a self-loop connects nothing).
+
+        Why it matters: an orphan occurred in the log but has no place in the drawn process, which
+        is the first plausibility check on a mined model (04-BUILD-PLAN.md, Day 5).
+        """
+        linked = self.edges[self.edges[SOURCE] != self.edges[TARGET]]
+        return sorted(set(self.activities) - set(linked[SOURCE]) - set(linked[TARGET]))
+
+    def to_dict(self) -> dict:
+        """Return a JSON-serialisable form for `heuristic_net.json` and the frontend."""
+        return {
+            "threshold": self.threshold,
+            "case_count": self.case_count,
+            "activities": self.activities,
+            "start_activities": self.start_activities,
+            "end_activities": self.end_activities,
+            "edges": [
+                {SOURCE: s, TARGET: t, KIND: k, DEPENDENCY: float(d), FREQUENCY: int(f)}
+                for s, t, k, d, f in self.edges[list(MODEL_EDGE_COLUMNS)].itertuples(
+                    index=False, name=None
+                )
+            ],
+        }
+
+
+def mine_heuristic_net(
+    event_log: pd.DataFrame,
+    threshold: float = DEFAULT_DEPENDENCY_THRESHOLD,
+    *,
+    connect_all: bool = True,
+) -> HeuristicNet:
+    """Mine the heuristic process model from a normalized event log.
+
+    Edges are admitted by four rules, applied in order; `kind` records which one applied:
+    1. `causal`: pairwise dependency at or above the threshold.
+    2. `length_one_loop`: self-loop measure at or above the threshold.
+    3. `length_two_loop`: return-pattern measure at or above the threshold admits both A->B and
+       B->A, keeping any direction already admitted as causal. This is what stops a loop being
+       read as parallelism.
+    4. `best_connection` (when `connect_all`): an activity left without an incoming edge, and not
+       a start activity, gets its strongest observed incoming pair; likewise outgoing edges for
+       non-end activities. Why: one global threshold can leave a rare activity with every link
+       below the bar, disconnected from a process the log clearly shows it belongs to. This is
+       the HeuristicsMiner's "all activities connected" heuristic, kept visibly distinct from
+       threshold-backed edges by its kind.
+
+    Why one threshold for all measures: a single setting then controls how much evidence any
+    edge needs, which keeps the model's strictness explainable in one sentence.
+    """
+    validate_dependency_threshold(threshold)
+    dfg = build_dfg(event_log)
+    admitted: dict[tuple[str, str], tuple[str, float, int]] = {}
+
+    for source, target, dependency, frequency in causal_edges(dfg, threshold).itertuples(
+        index=False, name=None
+    ):
+        admitted[(source, target)] = (CAUSAL, dependency, frequency)
+
+    for activity in sorted(dfg.activity_counts):
+        repeats = dfg.frequency(activity, activity)
+        measure = length_one_loop_measure(repeats)
+        if repeats and measure >= threshold:
+            admitted[(activity, activity)] = (LENGTH_ONE_LOOP, measure, repeats)
+
+    patterns = count_length_two_patterns(event_log)
+    for a, b in sorted({tuple(sorted(pair)) for pair in patterns}):
+        measure = length_two_loop_measure(patterns.get((a, b), 0), patterns.get((b, a), 0))
+        if measure >= threshold:
+            for source, target in ((a, b), (b, a)):
+                admitted.setdefault(
+                    (source, target), (LENGTH_TWO_LOOP, measure, dfg.frequency(source, target))
+                )
+
+    if connect_all:
+        _connect_all_activities(dfg, admitted)
+
+    rows = [(s, t, kind, measure, n) for (s, t), (kind, measure, n) in admitted.items()]
+    edges = pd.DataFrame(rows, columns=list(MODEL_EDGE_COLUMNS))
+    return HeuristicNet(
+        activities=dict(dfg.activity_counts),
+        start_activities=dict(dfg.start_activities),
+        end_activities=dict(dfg.end_activities),
+        edges=edges.sort_values([SOURCE, TARGET], kind="stable").reset_index(drop=True),
+        threshold=threshold,
+        case_count=dfg.case_count,
+    )
+
+
+def _connect_all_activities(
+    dfg: DirectlyFollowsGraph, admitted: dict[tuple[str, str], tuple[str, float, int]]
+) -> None:
+    """Give activities lacking an incoming or outgoing edge their strongest observed one.
+
+    Mutates `admitted`, visiting activities alphabetically so the result is deterministic. Start
+    activities need no incoming edge and end activities no outgoing edge. Only pairs observed in
+    the DFG are candidates; the highest dependency wins, then the higher frequency, then name order.
+    The winning dependency can be low or even negative; the `best_connection` kind flags that the
+    edge is there for connectivity, not because the threshold was met.
+    """
+    observed = [
+        (source, target, int(frequency))
+        for source, target, frequency in dfg.edges[[SOURCE, TARGET, FREQUENCY]].itertuples(
+            index=False, name=None
+        )
+        if source != target
+    ]
+
+    def admit_strongest(candidates: list[tuple[str, str, int]]) -> None:
+        """Admit the candidate with the highest dependency as a best connection, if any exist."""
+        if not candidates:
+            return
+        source, target, frequency = min(
+            candidates,
+            key=lambda c: (-dependency_measure(c[2], dfg.frequency(c[1], c[0])), -c[2], c[0], c[1]),
+        )
+        dependency = dependency_measure(frequency, dfg.frequency(target, source))
+        admitted[(source, target)] = (BEST_CONNECTION, dependency, frequency)
+
+    for activity in sorted(dfg.activity_counts):
+        if activity not in dfg.start_activities and not any(
+            t == activity and s != t for s, t in admitted
+        ):
+            admit_strongest([c for c in observed if c[1] == activity])
+        if activity not in dfg.end_activities and not any(
+            s == activity and s != t for s, t in admitted
+        ):
+            admit_strongest([c for c in observed if c[0] == activity])
