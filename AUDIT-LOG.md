@@ -4,6 +4,119 @@ Checkpoint entries per `06-AUDIT-PROTOCOL.md`. Newest first.
 
 ---
 
+## 2026-09-13 — Session 3 — End of Week 2 Day 13 checkpoint (branch `module-b-conformance`, HEAD `4d293a7`)
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Full test suite incl. integration | **Pass** — 256 passed in 51.5 s |
+| 2 | Linters/typecheck | **Pass** — `ruff check`, `ruff format --check`, `eslint`, `tsc` clean |
+| 3 | Requirements re-read: Module B req. 5 and acceptance, Day 13 plan | "Written diagnostic report with specific, quantified findings, every claim citing a number": **pass for the generator** — `render_diagnostic_report` uses fixed templates only (deterministic, no LLM, per 02-TECH-STACK and the Day 13 plan), with a test that each answer contains numbers. **Acceptance ("the report can answer, with numbers, % deviating, costliest transition, total rework time")**: the generator produces all three, verified against a hand-derived log (75.0% deviating, log fitness 0.708, D → E 24.0% of time, 15.5 case-hours of rework), and a preview on BPI 2017 was generated in the scratchpad and read end to end (93.0% / 0.576 under the literal reference; `A_Complete → A_Cancelled` 31.9%; rework 21.7%). **Not yet published**: `python -m meridian.conformance --reference ...` has not been run into `data/processed/` (0 Module B files there), because the reference model is Ved's decision. |
+| 4 | Scope drift | **Pass, documented** — the single Module B command now also writes bottleneck and rework tables and the report; the report adds caveats (reference dependence, rework-as-renegotiation, attribution rule, wait includes processing). Logged in `07-PROGRESS-STATE.md`. |
+| 5 | Hand-implemented list / LLM rule | **Pass** — no LLM, conformance or process-mining library. |
+| 6 | Git authorship | **Pass** — all non-merge commits `Vedjr02`, 0 co-author trailers, no NUL bytes. |
+
+**Failed → fixed**
+- A report test's filter for answer lines also matched a bold section heading; the test was
+  wrong, and was narrowed to the three numbered answers.
+- Wording found while deriving expected text by hand: totals under a day printed as "0 case-days"
+  (now case-hours), "1 occurrences" (now pluralised), "classified not classified", and a no-rework
+  log printing medians of nothing (now a plain sentence).
+- Several E501 line-length failures.
+
+---
+
+## 2026-09-13 — Session 3 — End of Week 2 Day 12 checkpoint (branch `module-b-conformance`, HEAD `2b59bd5`)
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Full test suite incl. integration | **Pass** — 248 passed in 51.6 s |
+| 2 | Linters/typecheck | **Pass** — `ruff check`, `ruff format --check`, `eslint`, `tsc` clean |
+| 3 | Requirements re-read: Module B req. 4, Day 12 plan | "Identify cases where the same activity recurs within one case": **pass** — per case, rework events (repetitions beyond the first) and repeated activities; per activity, cases, repeats and spans. "Quantify total added cycle time attributable to rework across the dataset": **pass** — `total_rework_seconds` and `rework_time_share`, using an attribution rule stated in the module docstring (union of first-to-last spans of repeated activities, so overlapping loops count once; explicitly not a counterfactual). Hand-derived tests cover overlap, disjoint spans and triple executions. Cycle times reconcile with Module A on synthetic data and on BPI 2017. |
+| 4 | Scope drift | **Pass, documented** — per-activity rework table and the per-affected-case rework distribution, both supporting the Day 13 report. Logged in `07-PROGRESS-STATE.md`. |
+| 5 | Hand-implemented list | **Pass** — interval union implemented by hand (vectorized sweep); no libraries beyond pandas/numpy. |
+| 6 | Git authorship | **Pass** — all non-merge commits `Vedjr02`, 0 co-author trailers, no NUL bytes. |
+
+**Real-log result (`complete`-only log)**: 16,234 of 31,509 cases (51.5%) repeat at least one
+activity; 149,309 case-days, **21.7% of all cycle time**, sit inside rework loops (per affected case:
+p50 5.8 d, p90 24.6 d, p99 50.6 d). The most looped activities are `A_Validating` (11,669 cases) and
+offer creation (`O_Create Offer`/`O_Created`, 8,559 cases). The report should note that repeated offers
+may be renegotiation rather than error correction.
+
+**Failed → fixed**: one long docstring, and a slow per-case lambda aggregation replaced with min/max.
+
+---
+
+## 2026-09-13 — Session 3 — End of Week 2 Day 11 checkpoint (branch `module-b-conformance`, HEAD `b923d5f`)
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Full test suite incl. integration | **Pass** — 240 passed in 50.5 s |
+| 2 | Linters/typecheck | **Pass** — `ruff check`, `ruff format --check`, `eslint`, `tsc` clean |
+| 3 | Requirements re-read: Module B req. 3, Day 11 plan | Wait-time **distribution** per transition, not just the mean: **pass** — Q1, p50, Q3, p90, p99, max and mean per transition. High-variance transitions flagged **separately** from uniformly slow ones: **pass** — `uniformly_slow`, `high_variance`, `slow_and_variable`, with every threshold justified in comments (median ≥ p75 of transition medians; quartile dispersion ≥ 0.5; ≥ 30 occurrences to classify). Groundwork for acceptance "which single transition costs the most aggregate time": `most_costly()`. Reconciliation: summed transition time equals Module A's summed cycle time, on synthetic data and on BPI 2017. Caveat stated in the module docstring: with `complete`-only events, "wait" includes the next activity's processing. |
+| 4 | Scope drift | **Pass, documented** — `transition_occurrences` extracted from the DFG, a behaviour-neutral refactor (DFG tests and real-log invariants unchanged); an explicit "insufficient data" kind for rare transitions. Logged in `07-PROGRESS-STATE.md`. |
+| 5 | Hand-implemented list | **Pass** — statistics with numpy percentiles only; no SciPy, process-mining or conformance library. |
+| 6 | Git authorship | **Pass** — all non-merge commits `Vedjr02`, 0 co-author trailers, no NUL bytes. |
+
+**Real-log result (`complete`-only log)**: 159 transitions; slow threshold 1.0 day; 6 uniformly slow,
+17 slow and variable, 38 high variance, 31 not flagged, 67 with too few occurrences. The costliest
+transition is `A_Complete → A_Cancelled`: 219,694 case-days (31.9% of all elapsed time), median 30.7
+days with quartiles 30.5–30.8 days — a near-constant wait consistent with a fixed cancellation window.
+Second is `A_Complete → A_Validating`: 23.7%, median 7.2 days.
+
+**Failed → fixed**: one long assertion line (auto-wrapped).
+
+---
+
+## 2026-09-13 — Session 3 — End of Week 2 Day 10 checkpoint (branch `module-b-conformance`, HEAD `85ba38d`)
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Full test suite incl. integration | **Pass** — 222 passed in 49.5 s, including real-log conformance invariants for both candidate references |
+| 2 | Linters/typecheck | **Pass** — `ruff check`, `ruff format --check`, `eslint`, `tsc` clean |
+| 3 | Requirements re-read: Module B req. 2 (per-case and aggregate fitness), Day 10 plan | Per-case and aggregate fitness: **pass** — `replay_log` → `LogReplay` (fitting cases, deviating share, pooled log fitness, case-fitness distribution), with hand-computed aggregates in `tests/test_replay_log.py` and `tests/test_conformance_pipeline.py`. "Run replay against the full real dataset": **done for evaluation, not published** — both candidate references were replayed on all 31,509 cases (0.5–0.6 s each) and the results added to the open question. The command (`python -m meridian.conformance --reference ...`) was **not** run into `data/processed/`, because that would mean choosing the reference model, which is Ved's decision. |
+| 4 | Scope drift | **Pass, documented** — mean case fitness by outcome added to the summary (the evidence behind the open question); the command requires an explicit reference flag. Logged in `07-PROGRESS-STATE.md`. |
+| 5 | Hand-implemented list | **Pass** — no conformance, Petri-net or process-mining library. |
+| 6 | Git authorship | **Pass** — all non-merge commits `Vedjr02`, 0 co-author trailers, no NUL bytes. |
+
+**Finding for the human** (recorded in `08-OPEN-QUESTIONS.md`): against the literal most-frequent
+variant, successful cases fit worst (0.477) and cancellations best (0.868); against the most frequent
+`pending` variant the ordering is coherent (0.755 pending). Under either reference, more than 90% of
+cases deviate from an exact single-path reference.
+
+**Failed → fixed**: several E501 line-length failures in docstrings.
+
+---
+
+## 2026-09-13 — Session 3 — End of Week 2 Day 9 checkpoint (branch `module-b-conformance`, HEAD `a0b8249`)
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Full test suite incl. integration | **Pass** — 211 passed in 47.8 s |
+| 2 | Linters/typecheck | **Pass** — `ruff check`, `ruff format --check`, `eslint`, `tsc` clean |
+| 3 | Requirements re-read: Module B req. 2, 02-TECH-STACK §2, Day 9 plan | Replay each case against the reference; count missing tokens (skipped required steps) and remaining tokens (extra or unexpected steps); fitness per case: **pass for a single case** — `replay_trace`, with the formula and its justification in the `ReplayResult.fitness` docstring. "Unit tests with known expected fitness for hand-crafted perfect, one-deviation and very-different cases": **pass** — `tests/test_replay.py`, eight hand-traced cases (perfect 1.0; skipped 0.75; swapped 0.8; repeated 0.833; unknown step 0.833; truncated 0.667; very different 0.0; empty 0.0), plus a 500-trace seeded check of token conservation (r − m = p − c) and fitness bounds. Aggregate fitness and the full-dataset run are Day 10. |
+| 4 | Scope drift | **Pass, documented** — fitness uses the standard two-term token-replay formula rather than the single ratio suggested in 02-TECH-STACK (the spec invites a justified choice); unknown activities count as one missing plus one remaining token. Both logged in `07-PROGRESS-STATE.md`. |
+| 5 | Hand-implemented list | **Pass** — replay written by hand; no conformance or Petri-net library. |
+| 6 | Git authorship | **Pass** — all non-merge commits `Vedjr02`, 0 co-author trailers, no NUL bytes. |
+
+**Failed → fixed**: one E501 in a test comment.
+
+---
+
+## 2026-09-13 — Session 3 — End of Week 2 Day 8 checkpoint (branch `module-b-conformance`, HEAD `904f16e`)
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Full test suite incl. integration | **Pass** — 200 passed in 48.0 s |
+| 2 | Linters/typecheck | **Pass** — `ruff check`, `ruff format --check`, `eslint`, `tsc` clean |
+| 3 | Requirements re-read: Module B req. 1, 02-TECH-STACK §2 (structure part), Day 8 plan | "Define a reference model — most frequent variant, or a documented process if provided — log which you used": **pass for the code** — `select_reference_model` implements both, plus the outcome-filtered alternative from the open question; every `ReferenceModel` carries a `description` recording how it was chosen. **Which strategy the real run uses is not decided**: blocked on `08-OPEN-QUESTIONS.md`, so the function has deliberately no default. "Petri-net-like structure": **pass** — the formal places-and-transitions version (`conformance/petri_net.py`), validated on construction. |
+| 4 | Scope drift | **Pass, documented** — formal Petri net instead of the allowed simplified graph; the outcome-filtered reference strategy exists only as an option pending Ved's answer. Logged in `07-PROGRESS-STATE.md`. |
+| 5 | Hand-implemented list | **Pass** — Petri net written by hand; no pm4py, SNAKES or other Petri-net or process-mining package installed or imported. |
+| 6 | Git authorship | **Pass** — 97 commits: all project commits `Vedjr02`, plus Ved's own GitHub merge commits for PRs #1–#3 (shown as "Vedant Ambre"); 0 co-author trailers. No NUL bytes in tracked files. |
+
+**Failed → fixed**: E501 line-length failures in three docstrings or strings; reworded or split.
+
+---
+
 ## 2026-09-13 — Session 2 — End of Week 1 Day 7 checkpoint, pre-merge (branch `module-a-discovery`, HEAD `40b7a65`)
 
 This is the Day 7 checkpoint, the pre-Week-2 checkpoint and the "before merging a module branch

@@ -67,7 +67,7 @@ def run_ingestion(settings: Settings, *, load_database: bool = True) -> Ingestio
 
     event_log, report = normalize_events(
         raw_events,
-        lifecycle_keep=settings.lifecycle_transitions,
+        lifecycle=settings.lifecycle_policy,
         outcome_activities=dict(dataset.outcome_activities),
     )
     if not report.is_fully_accounted:
@@ -117,8 +117,10 @@ def format_summary(result: IngestionResult) -> str:
         f"({report.parsed_cases:,} cases)",
         f"Normalized events:                 {report.normalized_events:,} "
         f"({report.normalized_cases:,} cases)",
-        f"Filtered by lifecycle (kept {report.lifecycle_kept or 'all'}): "
+        f"Filtered by lifecycle policy ({report.lifecycle_policy}): "
         f"{report.filtered_by_lifecycle:,}",
+        f"Activities represented by start events: "
+        f"{', '.join(report.activities_represented_by_start) or 'none'}",
         f"Excluded as malformed:             {report.total_excluded:,}",
     ]
     lines += [f"  - {reason}: {count:,}" for reason, count in report.excluded.items()]

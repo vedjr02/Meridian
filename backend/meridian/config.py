@@ -12,6 +12,8 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from meridian.ingestion.lifecycle import LifecyclePolicy
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -60,9 +62,9 @@ BPI_2017 = DatasetSource(
 DEFAULT_DATABASE_URL = "postgresql://localhost:5432/meridian"
 DEFAULT_TEST_DATABASE_URL = "postgresql://localhost:5432/meridian_test"
 
-# Pending decision, see 08-OPEN-QUESTIONS.md ("Lifecycle transitions vs. the single-timestamp
-# schema"): the normalized log keeps only `complete` transitions until Ved decides otherwise.
-DEFAULT_LIFECYCLE_TRANSITIONS: tuple[str, ...] = ("complete",)
+# Decided by Ved on 2026-09-13 (08-OPEN-QUESTIONS.md): represent activities by their start events
+# where the log records them, otherwise by completion. Complete-only undercounts W_ work by ~99%.
+DEFAULT_LIFECYCLE_POLICY = LifecyclePolicy.START_ELSE_COMPLETE
 
 # Heuristic Miner dependency threshold: a pair A->B becomes a causal edge when
 # (|A>B| - |B>A|) / (|A>B| + |B>A| + 1) reaches this value. 0.9 is the common default
@@ -88,7 +90,7 @@ class Settings:
     dataset: DatasetSource
     database_url: str
     test_database_url: str
-    lifecycle_transitions: tuple[str, ...] | None
+    lifecycle_policy: LifecyclePolicy
     dependency_threshold: float = DEFAULT_DEPENDENCY_THRESHOLD
 
     @property
@@ -142,23 +144,56 @@ class Settings:
         return self.processed_dir / "discovery_summary.md"
 
     @property
+    def conformance_cases_csv(self) -> Path:
+        """Per-case token-replay counts and fitness against the stated reference model."""
+        return self.processed_dir / "conformance_cases.csv"
+
+    @property
+    def conformance_summary_json(self) -> Path:
+        """Reference model used, how it was chosen, and log-level conformance aggregates."""
+        return self.processed_dir / "conformance_summary.json"
+
+    @property
+    def bottlenecks_csv(self) -> Path:
+        """Per-transition wait-time distribution, aggregate time and bottleneck classification."""
+        return self.processed_dir / "bottlenecks.csv"
+
+    @property
+    def rework_cases_csv(self) -> Path:
+        """Per-case rework events, repeated activities and cycle time inside rework loops."""
+        return self.processed_dir / "rework_cases.csv"
+
+    @property
+    def rework_activities_csv(self) -> Path:
+        """Per-activity rework: affected cases, repetitions and time spans."""
+        return self.processed_dir / "rework_activities.csv"
+
+    @property
+    def diagnostic_report_md(self) -> Path:
+        """Written Module B report answering the three diagnostic questions with numbers."""
+        return self.processed_dir / "diagnostic_report.md"
+
+    @property
     def ingestion_report_json(self) -> Path:
         """Accounting of the last ingestion run: counts kept, excluded and filtered, by reason."""
         return self.processed_dir / "ingestion_report.json"
 
 
-def _parse_lifecycle_transitions(value: str | None) -> tuple[str, ...] | None:
-    """Parse `MERIDIAN_LIFECYCLE_TRANSITIONS`: comma-separated names, or `all` for no filter.
+def _parse_lifecycle_policy(value: str | None) -> LifecyclePolicy:
+    """Parse `MERIDIAN_LIFECYCLE_POLICY`, rejecting unknown values with the allowed list.
 
-    Why configurable: which transitions the normalized log keeps is an open question for the
-    human (08-OPEN-QUESTIONS.md). Making it a setting means the answer is a re-run, not a rewrite.
+    Why still configurable after the decision: comparing policies on the same data (for example
+    to show how much complete-only undercounts) should be a re-run, not a code change.
     """
-    if value is None:
-        return DEFAULT_LIFECYCLE_TRANSITIONS
-    names = tuple(part.strip().lower() for part in value.split(",") if part.strip())
-    if names == ("all",):
-        return None
-    return names or DEFAULT_LIFECYCLE_TRANSITIONS
+    if value is None or not value.strip():
+        return DEFAULT_LIFECYCLE_POLICY
+    try:
+        return LifecyclePolicy(value.strip().lower())
+    except ValueError:
+        allowed = ", ".join(policy.value for policy in LifecyclePolicy)
+        raise ValueError(
+            f"MERIDIAN_LIFECYCLE_POLICY must be one of: {allowed}; got {value!r}"
+        ) from None
 
 
 def validate_dependency_threshold(value: float) -> float:
@@ -185,9 +220,7 @@ def get_settings() -> Settings:
         dataset=BPI_2017,
         database_url=os.environ.get("MERIDIAN_DATABASE_URL", DEFAULT_DATABASE_URL),
         test_database_url=os.environ.get("MERIDIAN_TEST_DATABASE_URL", DEFAULT_TEST_DATABASE_URL),
-        lifecycle_transitions=_parse_lifecycle_transitions(
-            os.environ.get("MERIDIAN_LIFECYCLE_TRANSITIONS")
-        ),
+        lifecycle_policy=_parse_lifecycle_policy(os.environ.get("MERIDIAN_LIFECYCLE_POLICY")),
         dependency_threshold=validate_dependency_threshold(
             float(os.environ.get("MERIDIAN_DEPENDENCY_THRESHOLD", DEFAULT_DEPENDENCY_THRESHOLD))
         ),

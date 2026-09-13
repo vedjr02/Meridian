@@ -56,6 +56,14 @@ def test_variants_needed_works_from_saved_counts_alone() -> None:
     assert variants_needed([], 0.8) == 0
 
 
+def test_exact_sequences_are_available_by_rank() -> None:
+    """Reference-model selection needs the activity tuple itself, not the display text."""
+    assert ANALYSIS.sequence(1) == ("A", "B", "C")
+    assert ANALYSIS.sequence(4) == ("A", "C")
+    with pytest.raises(ValueError, match="rank 5"):
+        ANALYSIS.sequence(5)
+
+
 def test_each_case_is_mapped_to_its_variant_rank() -> None:
     """Per-case happy-path checks rely on knowing each case's variant."""
     ranks = ANALYSIS.case_variants

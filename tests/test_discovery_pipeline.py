@@ -9,6 +9,7 @@ import pytest
 from meridian.config import Settings, get_settings
 from meridian.discovery import pipeline
 from meridian.discovery.pipeline import run_discovery
+from meridian.ingestion.lifecycle import LifecyclePolicy
 
 REAL_SETTINGS = get_settings()
 REAL_LOG = REAL_SETTINGS.raw_dir / REAL_SETTINGS.dataset.filename
@@ -34,7 +35,7 @@ def test_one_command_produces_every_acceptance_output(settings) -> None:
     assert summary.startswith("# Process discovery summary — Synthetic loan log")
     assert "Covering 80% of cases takes 2 of 2 distinct variants" in summary
     assert "| All cases | 3 |" in summary
-    assert "(lifecycle transitions kept: complete)" in summary
+    assert "(lifecycle rule: start where recorded, otherwise complete)" in summary
 
 
 def test_existing_normalized_log_is_reused_without_reingesting(settings, monkeypatch) -> None:
@@ -50,13 +51,13 @@ def test_existing_normalized_log_is_reused_without_reingesting(settings, monkeyp
     assert run_discovery(settings, load_database=False).ingested is False
 
 
-def test_lifecycle_description_reads_what_ingestion_recorded(settings) -> None:
-    """The summary describes the data on disk, and says so when no ingestion report exists."""
-    assert pipeline.lifecycle_description(settings) == "unknown (no ingestion report found)"
+def test_recorded_lifecycle_policy_reads_what_ingestion_recorded(settings) -> None:
+    """Summaries describe the data on disk, and know when no ingestion report exists."""
+    assert pipeline.recorded_lifecycle_policy(settings) is None
 
     run_discovery(settings, load_database=False)
 
-    assert pipeline.lifecycle_description(settings) == "complete"
+    assert pipeline.recorded_lifecycle_policy(settings) is LifecyclePolicy.START_ELSE_COMPLETE
 
 
 def test_command_prints_headline_and_output_paths(settings, monkeypatch, capsys) -> None:

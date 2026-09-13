@@ -46,12 +46,7 @@ def synthetic_settings(write_xes, tmp_path) -> Settings:
         sha256=hashlib.sha256(source_file.read_bytes()).hexdigest(),
         outcome_activities=(("Approve", "approved"),),
     )
-    return dataclasses.replace(
-        get_settings(),
-        data_dir=tmp_path / "data",
-        dataset=dataset,
-        lifecycle_transitions=("complete",),
-    )
+    return dataclasses.replace(get_settings(), data_dir=tmp_path / "data", dataset=dataset)
 
 
 def test_pipeline_writes_reconciled_outputs_without_database(synthetic_settings) -> None:
@@ -113,7 +108,8 @@ def test_real_bpi_2017_log_reconciles_end_to_end(tmp_path, pg_conn) -> None:
     """On the real log, every count reconciles from source file to database.
 
     31,509 cases and 1,202,267 events are the published size of BPI Challenge 2017. The other
-    expected values were measured when the raw log was first profiled (Day 2), so any change in
+    expected values were measured under the `start_else_complete` lifecycle policy (Ved's decision,
+    2026-09-13): 433,444 A_/O_ completions plus 128,227 W_ starts = 561,671 events. Any change in
     parsing or normalization behaviour on real data fails this test.
     """
     (tmp_path / "raw").mkdir()
@@ -129,8 +125,18 @@ def test_real_bpi_2017_log_reconciles_end_to_end(tmp_path, pg_conn) -> None:
     assert report.parsed_cases == report.normalized_cases == 31_509
     assert report.is_fully_accounted
     assert report.total_excluded == 0
-    assert report.normalized_events == 475_306
-    assert report.filtered_by_lifecycle == 1_202_267 - 475_306
+    assert report.normalized_events == 561_671
+    assert report.filtered_by_lifecycle == 1_202_267 - 561_671
+    assert report.activities_represented_by_start == [
+        "W_Assess potential fraud",
+        "W_Call after offers",
+        "W_Call incomplete files",
+        "W_Complete application",
+        "W_Handle leads",
+        "W_Personal Loan collection",
+        "W_Shortened completion",
+        "W_Validate application",
+    ]
     assert report.events_missing_resource == 0
     assert report.outcome_counts == {
         "pending": 17_228,
@@ -138,4 +144,4 @@ def test_real_bpi_2017_log_reconciles_end_to_end(tmp_path, pg_conn) -> None:
         "denied": 3_752,
         "no_terminal_state": 98,
     }
-    assert pg_conn.execute("SELECT count(*) FROM event_log").fetchone()[0] == 475_306
+    assert pg_conn.execute("SELECT count(*) FROM event_log").fetchone()[0] == 561_671

@@ -7,12 +7,10 @@
 
 ## Current phase
 
-`Week 1 (Module A) — complete: command-line acceptance (a)–(d) met, frontend view built, pre-merge checkpoint passed. Next: Week 2, Day 8 — Module B reference model (blocked on an open question, see below).`
+`Week 2, Day 13 — done (diagnostic report generator and single Module B command). Next: Ved decides the reference model → run `python -m meridian.conformance --reference ...` into data/processed/ → Week 2, Day 14 — Module B frontend and pre-Week-3 checkpoint.`
 
-Active branch: `module-a-discovery` (pushed, HEAD `40b7a65`). `origin/main` contains Module A up to
-`ce6f020` via Ved's PRs #1 and #2; the 4 frontend commits after that are pushed and **ready for a PR
-into `main`** (`gh` is not authenticated here, so Ved opens it). Never commit to `main` directly.
-Module B work belongs on a new branch, `module-b-conformance` (05-GIT-WORKFLOW.md).
+Active branch: `module-b-conformance`, created from `main` after Ved merged PR #3 (all of Module A
+is in `main`). Pushed. Never commit to `main` directly.
 
 ## Day 1 checklist (session 1)
 
@@ -78,7 +76,48 @@ Module B work belongs on a new branch, `module-b-conformance` (05-GIT-WORKFLOW.m
 - [x] Verified in the browser against the real API: map, variant highlighting, histogram, loading/empty/error states (details in `AUDIT-LOG.md`)
 - [x] Fixed: NUL bytes that made `ProcessMap.tsx` a binary file in git; unreadable 6 px map labels; table overflow; incomplete missing-file list
 - [x] Pre-merge checkpoint logged in `AUDIT-LOG.md` (186 tests, all green, build passes)
-- [ ] PR `module-a-discovery` → `main` for the 4 frontend commits (Ved)
+- [x] PR `module-a-discovery` → `main` (Ved merged PR #3)
+
+## Day 8 checklist (session 3)
+
+- [x] `VariantAnalysis.sequence(rank)` — exact activity tuples, not just display text (`backend/meridian/discovery/variants.py`)
+- [x] Labelled Petri net + `sequence_net(activities)` — `backend/meridian/conformance/petri_net.py` — `tests/test_petri_net.py`
+- [x] `select_reference_model(event_log, strategy, outcome=..., documented_activities=...)` → `ReferenceModel` with `description`, `supporting_cases`, `eligible_cases`; strategies `most_frequent_variant`, `most_frequent_variant_for_outcome`, `documented`; **no default strategy** — `backend/meridian/conformance/reference.py` — `tests/test_reference_model.py`
+- [x] Day 8 checkpoint logged in `AUDIT-LOG.md` (200 tests, all green)
+
+## Day 9 checklist (session 3)
+
+- [x] `replay_trace(net, trace)` → `ReplayResult` (produced, consumed, missing, remaining, unknown_activities, `fitness`, `fits`) — `backend/meridian/conformance/replay.py`
+- [x] Hand-traced tests (perfect, skipped, swapped, repeated, unknown, truncated, very different, empty) plus 500 seeded random traces checking conservation — `tests/test_replay.py`
+- [x] Day 9 checkpoint logged in `AUDIT-LOG.md` (211 tests, all green)
+
+## Day 10 checklist (session 3)
+
+- [x] `replay_log(event_log, net)` → `LogReplay` (per-case rows; `fitting_cases`, `deviating_share`, pooled `log_fitness`, `case_fitness_summary()`); each distinct sequence replayed once — `backend/meridian/conformance/replay.py` — `tests/test_replay_log.py`
+- [x] Command `python -m meridian.conformance --reference {most_frequent_variant|most_frequent_variant_for_outcome|documented} [--outcome X] [--documented-activity A ...]` → `conformance_cases.csv`, `conformance_summary.json` — `backend/meridian/conformance/pipeline.py` — `tests/test_conformance_pipeline.py`
+- [x] Both candidate references replayed on the real log as evidence; results in `08-OPEN-QUESTIONS.md`
+- [ ] **Waiting on Ved**: run the command into `data/processed/` with the chosen reference
+- [x] Day 10 checkpoint logged in `AUDIT-LOG.md` (222 tests, all green)
+
+## Day 11 checklist (session 3)
+
+- [x] `transition_occurrences(event_log)` extracted in `backend/meridian/discovery/dfg.py` (per-occurrence elapsed time, shared with `build_dfg`)
+- [x] `analyze_bottlenecks(event_log)` → `BottleneckAnalysis` (per transition: occurrences, cases, total and share of time, mean, Q1/p50/Q3/p90/p99/max, quartile dispersion, `kind`; `most_costly()`, `flagged(kind)`) — `backend/meridian/conformance/bottlenecks.py` — `tests/test_bottlenecks.py` (hand-computed, plus cycle-time reconciliation on synthetic and real data)
+- [x] Day 11 checkpoint logged in `AUDIT-LOG.md` (240 tests, all green)
+- [ ] Not yet: a bottleneck command/output file (planned with the Day 13 report generator)
+
+## Day 12 checklist (session 3)
+
+- [x] `analyze_rework(event_log)` → `ReworkAnalysis` (per case: rework events, repeated activities, rework seconds, cycle time, share; per activity: cases, repeats, total/median span; totals `total_rework_seconds`, `rework_time_share`, `rework_case_share`; `rework_time_distribution()`) — `backend/meridian/conformance/rework.py` — `tests/test_rework.py`
+- [x] Day 12 checkpoint logged in `AUDIT-LOG.md` (248 tests, all green)
+
+## Day 13 checklist (session 3)
+
+- [x] `render_diagnostic_report(DiagnosticInputs)` — deterministic Markdown answering the three acceptance questions, then conformance, bottleneck and rework evidence and caveats — `backend/meridian/conformance/report.py` — `tests/test_diagnostic_report.py`
+- [x] Single Module B command: `python -m meridian.conformance --reference STRATEGY [--outcome X]` → `run_diagnosis` writes `conformance_cases.csv`, `conformance_summary.json`, `bottlenecks.csv`, `rework_cases.csv`, `rework_activities.csv`, `diagnostic_report.md` — `backend/meridian/conformance/pipeline.py`
+- [x] Real-log preview rendered in the scratchpad and reviewed (not published)
+- [ ] **Waiting on Ved**: reference-model decision, then run the command into `data/processed/`
+- [x] Day 13 checkpoint logged in `AUDIT-LOG.md` (256 tests, all green)
 
 ## Real-data facts established (BPI 2017, measured session 2)
 
@@ -90,6 +129,8 @@ Module B work belongs on a new branch, `module-b-conformance` (05-GIT-WORKFLOW.m
 - Full ingestion takes ~16 s (parse ~11 s).
 - Variants (`complete`-only log): 5,623 distinct for 31,509 cases; 610 cover 80% of cases; top variant 7.0% of cases; 4,150 single-case variants. **Top 3 variants (5,704 cases) all end cancelled** (see 08-OPEN-QUESTIONS.md). Most common variant among `pending` cases is rank 4 (969 cases).
 - Cycle time (`complete`-only log): p50 19.1 d, p90 35.0 d, p99 59.1 d, mean 21.8 d, max 169.1 d. Most common variant p50 31.7 d against 17.9 d for all others.
+- Rework (`complete`-only log): 16,234 of 31,509 cases (51.5%) repeat an activity; 149,309 case-days = 21.7% of all cycle time sit inside rework loops; per affected case p50 5.8 d, p90 24.6 d. Top: `A_Validating` (11,669 cases), offer creation (8,559 cases; possibly renegotiation, not errors).
+- Bottlenecks (`complete`-only log): costliest transition `A_Complete → A_Cancelled`, 31.9% of all elapsed case-time, median 30.7 d with quartiles 30.5–30.8 d (looks like a fixed cancellation window, i.e. policy rather than capacity); next `A_Complete → A_Validating`, 23.7%, median 7.2 d. Slow threshold 1.0 d. Kinds: 6 uniformly slow, 17 slow and variable, 38 high variance, 31 not flagged, 67 insufficient data.
 - Heuristic net (threshold 0.9, `complete`-only log): 98 edges — 83 causal, 5 length-one loops, 10 length-two-loop edges, 0 best connections; no orphans; mined in 0.3 s. `O_Create Offer ⇄ O_Created` is a length-two loop (multiple offers). Largest rework loop: `A_Incomplete ⇄ A_Validating` (12,282 / 4,427 transitions) — a Module B lead.
 - DFG (`complete`-only log): 443,797 transitions, 159 distinct edges, built in 0.7 s. All 31,509 cases start with `A_Create Application`. Top edge `O_Create Offer -> O_Created` (42,995). Early bottleneck signal for Module B: `A_Complete -> A_Validating` median 7.2 d, mean 8.9 d.
 - The raw XES is one line with no newlines — never grep or line-read it.
@@ -99,7 +140,7 @@ Module B work belongs on a new branch, `module-b-conformance` (05-GIT-WORKFLOW.m
 | Module | Status | Notes |
 |---|---|---|
 | A — Process Discovery | **Complete** (Week 1): command-line acceptance met, frontend `/discovery` built and verified | Awaiting PR for last 4 commits |
-| B — Conformance & Diagnosis | Not started | Reference model blocked on open question (most common variant ends cancelled). Will need start/end pairing from `raw_events.csv` for processing vs. waiting time |
+| B — Conformance & Diagnosis | Days 8–13 done (Petri net, reference selection, replay, bottlenecks, rework, report, single command) | Needs reference decision to publish outputs; then Day 14 frontend. Published conformance run waits for the reference decision. Real-data reference choice blocked on open question. Will need start/end pairing from `raw_events.csv` for processing vs. waiting time |
 | C — Automation Scoring | Not started | |
 | D — Business Case & ROI | Not started | |
 | E — Organizational Network | Not started | Resource data is complete. 5 resources (User_145–149) exist only in non-`complete` transitions |
@@ -108,25 +149,24 @@ Module B work belongs on a new branch, `module-b-conformance` (05-GIT-WORKFLOW.m
 
 ## Last session summary
 
-**2026-09-13 (sessions 2–3)** — Completed all of Week 1 (Module A): ingestion, DFG, heuristic
-miner, variants, cycle times, written summary, single command, discovery API and the frontend view,
-with a checkpoint after each day and a pre-merge checkpoint at the end. All commits authored by
-Vedjr02 with no AI co-author trailers (see `05-GIT-WORKFLOW.md`).
+**2026-09-13 (session 3)** — Week 1 was merged into `main` (Ved's PR #3). Completed Week 2 Days 8–13
+on `module-b-conformance`: Petri net, reference selection, token replay, full-log replay and
+aggregates, bottleneck analysis, rework analysis, diagnostic report and the single Module B command,
+with a checkpoint after each day. All commits authored by Vedjr02 with no AI co-author trailers.
 
-Exact stopping point: pre-merge checkpoint passed and logged; working tree clean on
-`module-a-discovery`, pushed at `40b7a65`. Nothing mid-change.
+Exact stopping point: Day 13 checkpoint passed and logged; working tree clean on
+`module-b-conformance`, pushed. Nothing mid-change. No Module B outputs in `data/processed/` yet.
 
-**Start Week 2 (Day 8) here:**
-1. `08-OPEN-QUESTIONS.md` has **two open questions for Ved**. Lifecycle transitions: all real
-   numbers depend on it. Most common variant ends cancelled: this decides Module B's reference
-   model. Do not pick the reference model yourself.
-2. Unblocked meanwhile: create `module-b-conformance` (from `main` once the Module A PR is merged,
-   otherwise from `module-a-discovery`). Build the simplified Petri-net-like reference structure
-   and the reference-model selection so that both candidate strategies ("most frequent variant",
-   "most frequent variant among a given outcome") exist and are tested on synthetic logs, with the
-   default left to Ved's answer. Day 9's token-replay core is also testable on synthetic logs.
-3. Module B requirements 1–2 (01-REQUIREMENTS.md) and 02-TECH-STACK §2: justify the fitness
-   formula in a code comment; log which reference model was used.
+**Start here next session:**
+1. `08-OPEN-QUESTIONS.md` still has **two open questions for Ved**: the reference model (with
+   real-log evidence for both candidates) and lifecycle transitions. Do not choose the reference.
+2. Once the reference is decided: `.venv/bin/python -m meridian.conformance --reference <strategy>
+   [--outcome pending]`, read `data/processed/diagnostic_report.md`, and verify the Module B acceptance
+   questions are answered.
+3. Then Day 14: Module B frontend (03-UIUX-RULES.md §3: lead with headline stat cards such as "X% of
+   cases deviate" and "Y days added by rework" before any chart; bottleneck chart; rework findings)
+   plus read-only API endpoints over the Module B outputs, like `/api/discovery/*`. Then the
+   pre-Week-3 checkpoint and a PR from `module-b-conformance` into `main`.
 4. To run the frontend: `.venv/bin/uvicorn meridian.api.main:app` and
    `npm --prefix frontend run dev`, then open http://localhost:3000.
 
@@ -141,6 +181,13 @@ Exact stopping point: pre-merge checkpoint passed and logged; working tree clean
 - 2026-09-13 — Optional `outcome` column filled from each case's last terminal application state (A_Pending/A_Denied/A_Cancelled → pending/denied/cancelled; NULL for 98 open cases). `cost` stays NULL: BPI 2017 has no per-event cost.
 - 2026-09-13 — Added `psycopg[binary]` (the driver for the PostgreSQL already in the tech stack) and an `ingestion_run` audit table (tech stack: Postgres stores "past decision/audit runs").
 - 2026-09-13 — Pre-commit runs every test except `integration` (real-data, ~16 s); integration tests run at each checkpoint.
+- 2026-09-13 — The single Module B command (`python -m meridian.conformance --reference ...`) runs conformance, bottlenecks and rework and writes the report, rather than separate commands per analysis. Reason: the acceptance criterion is one report answering all three questions, and sharing one read of the log guarantees the analyses describe the same events. The report adds caveats on reference dependence, repeated offers possibly being renegotiation, the rework attribution rule, and waits including processing time.
+- 2026-09-13 — Rework time is attributed as the union of each repeated activity's first-to-last span per case. Reason: requirement 4 asks for time "attributable to rework" without defining attribution; this rule is transparent, never double-counts overlapping loops, and is labelled as attribution rather than a counterfactual saving. A per-activity table is added so the Day 13 report can name the loops.
+- 2026-09-13 — Bottleneck classification adds `slow_and_variable` (both flags) and `insufficient_data` (under 30 occurrences) beside the required "uniformly slow" and "high variance". Reason: a transition can genuinely be both, and classifying tiny samples would report noise as findings.
+- 2026-09-13 — The conformance summary adds mean case fitness per outcome. Reason: it is the evidence that shows whether a reference model is a sensible "intended path" (on BPI 2017 it exposed that the literal most-frequent variant rewards cancellations).
+- 2026-09-13 — Token-replay fitness is the standard two-term formula 0.5(1 − m/c) + 0.5(1 − r/p) (Rozinat and van der Aalst 2008), not the single ratio 02-TECH-STACK suggests (the spec asks for a justified choice). Reason: missing and remaining deviations are scored separately so neither dilutes the other, and results match the standard definition. Activities absent from the reference count as one missing plus one remaining token.
+- 2026-09-13 — Module B uses a formal labelled Petri net (places, transitions, markings) rather than the simplified "graph with required order" that 02-TECH-STACK also allows. Reason: missing/remaining tokens need places to refer to; restriction: no silent transitions.
+- 2026-09-13 — Reference selection offers a third strategy, "most frequent variant for an outcome", beside the two in 01-REQUIREMENTS. Reason: the open question about the cancellation path; it is an option only, and the function has no default until Ved decides.
 - 2026-09-13 — Process-map layout is hand-written (breadth-first stages plus barycenter crossing reduction) and computed in the backend. Reason: 02-TECH-STACK lists only force-directed graph libraries, which scatter a left-to-right process map; layered layout libraries (dagre, elkjs) are not in the stack. The map and histogram are hand-drawn SVG, so no chart or graph package was installed even though Recharts and react-force-graph are allowed.
 - 2026-09-13 — Frontend reads a new read-only discovery API (`/api/discovery/*`) that serves precomputed outputs rather than recomputing, so the page and the written summary always show the same numbers.
 - 2026-09-13 — The process map opens at a legible zoom (fills canvas height from the process start) rather than fit-to-width. Reason: measured 6.2 px labels at fit-to-width on a 1512 px viewport; the whole map is one click away.

@@ -27,7 +27,7 @@ EDGE_COLUMNS = (SOURCE, TARGET, FREQUENCY, CASE_FREQUENCY, MEAN_DURATION, MEDIAN
 
 REQUIRED_COLUMNS = (schema.CASE_ID, schema.EVENT_INDEX, schema.ACTIVITY, schema.TIMESTAMP)
 
-_DURATION = "duration_seconds"
+DURATION = "duration_seconds"
 
 
 @dataclass(frozen=True)
@@ -101,32 +101,8 @@ def build_dfg(event_log: pd.DataFrame) -> DirectlyFollowsGraph:
     mean alone misrepresents a typical transition (03-UIUX-RULES.md rule 1). Full distributions
     belong to Module B's bottleneck analysis.
     """
-    missing = [column for column in REQUIRED_COLUMNS if column not in event_log.columns]
-    if missing:
-        raise ValueError(f"Event log is missing required columns: {missing}")
-
-    log = (
-        event_log.loc[:, list(REQUIRED_COLUMNS)]
-        .sort_values([schema.CASE_ID, schema.EVENT_INDEX], kind="stable")
-        .reset_index(drop=True)
-    )
-    following = log.shift(-1)
-    same_case = (
-        log[schema.CASE_ID].eq(following[schema.CASE_ID]).to_numpy(dtype=bool, na_value=False)
-    )
-
-    transitions = pd.DataFrame(
-        {
-            SOURCE: log.loc[same_case, schema.ACTIVITY].to_numpy(),
-            TARGET: following.loc[same_case, schema.ACTIVITY].to_numpy(),
-            schema.CASE_ID: log.loc[same_case, schema.CASE_ID].to_numpy(),
-            _DURATION: (
-                following.loc[same_case, schema.TIMESTAMP] - log.loc[same_case, schema.TIMESTAMP]
-            )
-            .dt.total_seconds()
-            .to_numpy(),
-        }
-    )
+    log = _ordered_log(event_log)
+    transitions = transition_occurrences(log)
 
     by_case = log.groupby(schema.CASE_ID, sort=False)[schema.ACTIVITY]
     return DirectlyFollowsGraph(
@@ -135,6 +111,45 @@ def build_dfg(event_log: pd.DataFrame) -> DirectlyFollowsGraph:
         end_activities=_sorted_counts(by_case.last()),
         activity_counts=_sorted_counts(log[schema.ACTIVITY]),
         case_count=int(log[schema.CASE_ID].nunique()),
+    )
+
+
+def _ordered_log(event_log: pd.DataFrame) -> pd.DataFrame:
+    """Validate required columns and return events sorted by case, then source position."""
+    missing = [column for column in REQUIRED_COLUMNS if column not in event_log.columns]
+    if missing:
+        raise ValueError(f"Event log is missing required columns: {missing}")
+    return (
+        event_log.loc[:, list(REQUIRED_COLUMNS)]
+        .sort_values([schema.CASE_ID, schema.EVENT_INDEX], kind="stable")
+        .reset_index(drop=True)
+    )
+
+
+def transition_occurrences(event_log: pd.DataFrame) -> pd.DataFrame:
+    """Return every individual directly-follows occurrence with its elapsed time.
+
+    Columns: `source`, `target`, `case_id`, `duration_seconds`, one row per pair of consecutive
+    events in a case. Why this is public: the DFG aggregates these into one row per pair, while
+    Module B's bottleneck analysis needs the full distribution behind each pair. Both reading the
+    same function guarantees they describe the same transitions.
+    """
+    log = _ordered_log(event_log)
+    following = log.shift(-1)
+    same_case = (
+        log[schema.CASE_ID].eq(following[schema.CASE_ID]).to_numpy(dtype=bool, na_value=False)
+    )
+    return pd.DataFrame(
+        {
+            SOURCE: log.loc[same_case, schema.ACTIVITY].to_numpy(),
+            TARGET: following.loc[same_case, schema.ACTIVITY].to_numpy(),
+            schema.CASE_ID: log.loc[same_case, schema.CASE_ID].to_numpy(),
+            DURATION: (
+                following.loc[same_case, schema.TIMESTAMP] - log.loc[same_case, schema.TIMESTAMP]
+            )
+            .dt.total_seconds()
+            .to_numpy(),
+        }
     )
 
 
@@ -162,8 +177,8 @@ def _aggregate_edges(transitions: pd.DataFrame) -> pd.DataFrame:
             **{
                 FREQUENCY: (schema.CASE_ID, "size"),
                 CASE_FREQUENCY: (schema.CASE_ID, "nunique"),
-                MEAN_DURATION: (_DURATION, "mean"),
-                MEDIAN_DURATION: (_DURATION, "median"),
+                MEAN_DURATION: (DURATION, "mean"),
+                MEDIAN_DURATION: (DURATION, "median"),
             }
         )
         .reset_index()

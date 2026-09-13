@@ -38,16 +38,28 @@ class VariantAnalysis:
             variants are ordered by their display text so ranks are identical across runs.
         case_variants: Variant rank per case id.
         case_count: Number of cases analysed.
+        sequences: Activity tuple of each variant, indexed by rank - 1. Kept alongside the display
+            text because only the tuple is exact: an activity name containing the separator would
+            make the text ambiguous.
     """
 
     variants: pd.DataFrame
     case_variants: pd.Series
     case_count: int
+    sequences: tuple[tuple[str, ...], ...] = ()
 
     @property
     def variant_count(self) -> int:
         """Number of distinct end-to-end paths."""
         return len(self.variants)
+
+    def sequence(self, rank: int) -> tuple[str, ...]:
+        """Return the exact activity sequence of the variant with this rank (1 = most frequent)."""
+        if not 1 <= rank <= len(self.sequences):
+            raise ValueError(
+                f"No variant with rank {rank}; ranks run from 1 to {len(self.sequences)}"
+            )
+        return self.sequences[rank - 1]
 
     def variants_to_cover(self, share: float = 0.8) -> int:
         """Return the fewest most-frequent variants whose cases make up at least `share` of cases.
@@ -121,4 +133,5 @@ def analyze_variants(event_log: pd.DataFrame) -> VariantAnalysis:
         variants=pd.DataFrame(rows, columns=list(VARIANT_COLUMNS)),
         case_variants=case_variants,
         case_count=total,
+        sequences=tuple(sequence for sequence, _ in ordered),
     )

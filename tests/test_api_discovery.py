@@ -35,7 +35,8 @@ def test_overview_headline_numbers(client) -> None:
     assert (body["case_count"], body["event_count"], body["activity_count"]) == (3, 8, 4)
     assert (body["variant_count"], body["variants_to_cover"]) == (2, 2)
     assert body["top_variant_share"] == pytest.approx(2 / 3)
-    assert body["lifecycle_kept"] == "complete"
+    assert body["lifecycle"]["policy"] == "start_else_complete"
+    assert body["lifecycle"]["caveat"].startswith("Lifecycle rule: start where recorded")
     cycle = body["cycle_time_seconds"]
     assert cycle["all_cases"]["p50"] == 7200.0
     assert cycle["most_common_variant"]["count"] == 2

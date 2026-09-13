@@ -37,6 +37,7 @@ from meridian.discovery.variants import (
 )
 from meridian.discovery.visualize import MermaidDiagram
 from meridian.ingestion import schema
+from meridian.ingestion.lifecycle import LifecyclePolicy
 
 TOP_VARIANTS_SHOWN = 5
 NO_OUTCOME = "no terminal state"
@@ -46,8 +47,8 @@ NO_OUTCOME = "no terminal state"
 class DiscoveryInputs:
     """Everything the summary is generated from, computed beforehand by the discovery modules.
 
-    `lifecycle_kept` describes the transitions in the event log as ingestion recorded them, not
-    the current setting, because the summary must describe the data it was computed from.
+    `lifecycle` is the policy ingestion recorded for this log (None if unknown), not the current
+    setting, because the summary must describe the data it was computed from.
     """
 
     dataset_name: str
@@ -56,7 +57,7 @@ class DiscoveryInputs:
     variants: VariantAnalysis
     case_stats: pd.DataFrame
     diagram: MermaidDiagram
-    lifecycle_kept: str
+    lifecycle: LifecyclePolicy | None
     coverage_share: float = 0.8
 
 
@@ -74,6 +75,21 @@ def format_measure(value: float) -> str:
     denominator), so printing 0.99987 as "1.000" would claim a certainty the evidence cannot give.
     """
     return ">0.999" if value >= 0.9995 else f"{value:.3f}"
+
+
+def lifecycle_label(lifecycle: LifecyclePolicy | None) -> str:
+    """Name the lifecycle rule for a scope line, or say it is unknown."""
+    return lifecycle.description if lifecycle else "unknown (no ingestion report found)"
+
+
+def lifecycle_caveat(lifecycle: LifecyclePolicy | None) -> str:
+    """The lifecycle caveat for a report, including the case where the rule is unknown."""
+    if lifecycle is None:
+        return (
+            "The lifecycle rule used to build this log is unknown (no ingestion report found), so "
+            "it is unclear whether durations run between starts, completions or both."
+        )
+    return f"Lifecycle rule: {lifecycle.description}. {lifecycle.caveat}"
 
 
 def _plural(count: int, singular: str, plural: str) -> str:
@@ -117,8 +133,9 @@ def _header(inputs: DiscoveryInputs) -> str:
     return (
         f"# Process discovery summary — {inputs.dataset_name}\n\n"
         f"Computed from {events:,} events in {inputs.variants.case_count:,} cases across "
-        f"{len(inputs.dfg.activity_counts)} activities (lifecycle transitions kept: "
-        f"{inputs.lifecycle_kept}). Every figure is computed from the event log; none is estimated."
+        f"{len(inputs.dfg.activity_counts)} activities (lifecycle rule: "
+        f"{lifecycle_label(inputs.lifecycle)}). Every figure is computed from the event log; none "
+        "is estimated."
     )
 
 
@@ -305,12 +322,7 @@ def _caveats_section(inputs: DiscoveryInputs) -> str:
     stats = inputs.case_stats
     outcomes = _outcomes(stats)
     caveats = []
-    if inputs.lifecycle_kept != "all":
-        caveats.append(
-            f"- Only `{inputs.lifecycle_kept}` lifecycle transitions are in this log. Which "
-            "transitions to keep is an open decision (08-OPEN-QUESTIONS.md), and variant counts "
-            "and cycle times change with it."
-        )
+    caveats.append(f"- {lifecycle_caveat(inputs.lifecycle)}")
     rank_one_mix = _outcome_mix(outcomes[stats[IS_HAPPY_PATH]])
     caveats.append(
         '- "Most common variant" is the requirements\' definition of the happy path. Its cases '

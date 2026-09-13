@@ -57,17 +57,13 @@ export default function DiscoveryView({ data }: { data: DiscoveryData }) {
         </dl>
       </header>
 
-      {overview.lifecycle_kept !== "all" ? (
-        <p className={styles.caveat} role="note">
-          <span className={styles.caveatTag}>Caveat</span>
-          Only &ldquo;{overview.lifecycle_kept}&rdquo; lifecycle transitions are included. Which
-          transitions to keep is still an open decision, and variant counts and cycle times change
-          with it.
-          {overview.open_case_count > 0
-            ? ` ${formatCount(overview.open_case_count)} cases had not finished when the log was extracted; their cycle times are lower bounds.`
-            : ""}
-        </p>
-      ) : null}
+      <p className={styles.caveat} role="note">
+        <span className={styles.caveatTag}>Caveat</span>
+        {overview.lifecycle.caveat}
+        {overview.open_case_count > 0
+          ? ` ${formatCount(overview.open_case_count)} cases had not finished when the log was extracted; their cycle times are lower bounds.`
+          : ""}
+      </p>
 
       <div className={styles.workspace}>
         <section className={styles.panel} aria-labelledby="map-title">
