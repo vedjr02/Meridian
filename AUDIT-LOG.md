@@ -4,6 +4,26 @@ Checkpoint entries per `06-AUDIT-PROTOCOL.md`. Newest first.
 
 ---
 
+## 2026-09-13 — Session 3 — End of Week 2 Day 10 checkpoint (branch `module-b-conformance`, HEAD `85ba38d`)
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Full test suite incl. integration | **Pass** — 222 passed in 49.5 s, including real-log conformance invariants for both candidate references |
+| 2 | Linters/typecheck | **Pass** — `ruff check`, `ruff format --check`, `eslint`, `tsc` clean |
+| 3 | Requirements re-read: Module B req. 2 (per-case and aggregate fitness), Day 10 plan | Per-case and aggregate fitness: **pass** — `replay_log` → `LogReplay` (fitting cases, deviating share, pooled log fitness, case-fitness distribution), with hand-computed aggregates in `tests/test_replay_log.py` and `tests/test_conformance_pipeline.py`. "Run replay against the full real dataset": **done for evaluation, not published** — both candidate references were replayed on all 31,509 cases (0.5–0.6 s each) and the results added to the open question. The command (`python -m meridian.conformance --reference ...`) was **not** run into `data/processed/`, because that would mean choosing the reference model, which is Ved's decision. |
+| 4 | Scope drift | **Pass, documented** — mean case fitness by outcome added to the summary (the evidence behind the open question); the command requires an explicit reference flag. Logged in `07-PROGRESS-STATE.md`. |
+| 5 | Hand-implemented list | **Pass** — no conformance, Petri-net or process-mining library. |
+| 6 | Git authorship | **Pass** — all non-merge commits `Vedjr02`, 0 co-author trailers, no NUL bytes. |
+
+**Finding for the human** (recorded in `08-OPEN-QUESTIONS.md`): against the literal most-frequent
+variant, successful cases fit worst (0.477) and cancellations best (0.868); against the most frequent
+`pending` variant the ordering is coherent (0.755 pending). Under either reference, more than 90% of
+cases deviate from an exact single-path reference.
+
+**Failed → fixed**: several E501 line-length failures in docstrings.
+
+---
+
 ## 2026-09-13 — Session 3 — End of Week 2 Day 9 checkpoint (branch `module-b-conformance`, HEAD `a0b8249`)
 
 | # | Check | Result |
