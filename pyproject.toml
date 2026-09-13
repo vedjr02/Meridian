@@ -11,6 +11,7 @@ dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
     "pandas>=2.2",
+    "psycopg[binary]>=3.2",
 ]
 
 [project.optional-dependencies]
@@ -27,6 +28,9 @@ where = ["backend"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"
+markers = [
+    "integration: runs against the real downloaded BPI 2017 log (slow; run at checkpoints)",
+]
 
 [tool.ruff]
 line-length = 100
