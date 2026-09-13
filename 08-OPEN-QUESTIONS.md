@@ -70,7 +70,26 @@ Options (all four are a config change plus re-run, because every transition is p
 happened with one timestamp per activity and no schema change, and Module B/F can still pair
 start with complete/ate_abort from `raw_events.csv` for processing times. The default stays A
 until you decide, per "log it, don't unilaterally switch approaches".
-**Status**: open — needed before Day 5's real-data integration run
+**Status**: resolved — 2026-09-13, Ved chose **B** (start where recorded, complete otherwise).
+Ved's reasoning, recorded as given:
+- Complete-only (A) is not acceptable even temporarily. It is a data-integrity problem, not a
+  minor caveat: 342 of 31,485 actual `W_Call after offers` occurrences is a ~99% undercount of the
+  process's real human work.
+- Keeping all transitions with a lifecycle column (D) is legitimate **future work** (full
+  lifecycle and duration modelling), not built now, because every module would have to handle
+  start/complete pairs, not just ingestion.
+- Action: re-ingest, regenerate Module A outputs, update the pinned real-data test counts, then
+  publish Module B.
+Implementation: the rule is data-driven, not keyed on the `W_` prefix. An activity is represented
+by its `start` events if the log records any `start` for it, otherwise by its `complete` events.
+On BPI 2017 this selects exactly the eight `W_` activities.
+
+## Future work — full lifecycle modelling (option D above)
+
+Keep every lifecycle transition and add a `lifecycle` column to the shared schema so modules can
+pair start with complete/ate_abort for processing versus waiting time. Deferred by Ved on
+2026-09-13: it changes every module, not just ingestion. `data/processed/raw_events.csv` already
+preserves all transitions, so it needs no re-parse when picked up.
 
 ## 2026-09-13 — Module A / B — The most common variant is a cancellation path
 
@@ -105,7 +124,18 @@ the most frequent variant among `pending` cases as the reference model (B above)
 choice. This also depends on the lifecycle question above, which changes the variants themselves.
 Until answered, `select_reference_model` has no default and the conformance command will require
 the strategy to be named explicitly.
-**Status**: open — the Day 8–9 code is done without a default; the real-data conformance outputs (Day 10+) need this answer
+**Status**: resolved — 2026-09-13, Ved chose **A**: the most frequent variant overall, as originally
+specified in 01-REQUIREMENTS.md. Ved's reasoning, recorded as given:
+- Option B's "coherent ordering" argument is circular: whichever group's variant is picked as the
+  reference will always score best against itself. (Claude agrees; the evidence above cannot favour
+  B for that reason.)
+- Option A has a much larger sample: 2,209 cases against 969.
+- The modal path ending in cancellation rather than approval is itself a diagnostic finding worth
+  reporting, not something to route around.
+Consequences: the conformance command defaults to `most_frequent_variant`, and the diagnostic
+report presents the modal path's outcome as a finding. The reference is re-selected on the log
+produced by the lifecycle decision above, so the modal path itself may change from the one described
+here.
 
 ## 2026-09-13 — Module A (infra) — Which BPI dataset, and repo setup
 
