@@ -7,7 +7,7 @@
 
 ## Current phase
 
-`Week 2, Day 8 — done (Petri net + reference selection; which reference the real run uses is still Ved's open question). Next: Week 2, Day 9 — token-based replay core.`
+`Week 2, Day 9 — done (token-based replay core). Next: Week 2, Day 10 — replay across the full log, per-case and aggregate fitness (the real run's reference model is still Ved's open question).`
 
 Active branch: `module-b-conformance`, created from `main` after Ved merged PR #3 (all of Module A
 is in `main`). Pushed. Never commit to `main` directly.
@@ -85,6 +85,12 @@ is in `main`). Pushed. Never commit to `main` directly.
 - [x] `select_reference_model(event_log, strategy, outcome=..., documented_activities=...)` → `ReferenceModel` with `description`, `supporting_cases`, `eligible_cases`; strategies `most_frequent_variant`, `most_frequent_variant_for_outcome`, `documented`; **no default strategy** — `backend/meridian/conformance/reference.py` — `tests/test_reference_model.py`
 - [x] Day 8 checkpoint logged in `AUDIT-LOG.md` (200 tests, all green)
 
+## Day 9 checklist (session 3)
+
+- [x] `replay_trace(net, trace)` → `ReplayResult` (produced, consumed, missing, remaining, unknown_activities, `fitness`, `fits`) — `backend/meridian/conformance/replay.py`
+- [x] Hand-traced tests (perfect, skipped, swapped, repeated, unknown, truncated, very different, empty) plus 500 seeded random traces checking conservation — `tests/test_replay.py`
+- [x] Day 9 checkpoint logged in `AUDIT-LOG.md` (211 tests, all green)
+
 ## Real-data facts established (BPI 2017, measured session 2)
 
 - 31,509 cases, 1,202,267 events, 26 activities, 149 resources. Every event has case id, activity,
@@ -104,7 +110,7 @@ is in `main`). Pushed. Never commit to `main` directly.
 | Module | Status | Notes |
 |---|---|---|
 | A — Process Discovery | **Complete** (Week 1): command-line acceptance met, frontend `/discovery` built and verified | Awaiting PR for last 4 commits |
-| B — Conformance & Diagnosis | Day 8 done (Petri net, reference selection) | Day 9 next: token replay. Real-data reference choice blocked on open question. Will need start/end pairing from `raw_events.csv` for processing vs. waiting time |
+| B — Conformance & Diagnosis | Days 8–9 done (Petri net, reference selection, token replay core) | Day 10 next: full-log replay and aggregates. Real-data reference choice blocked on open question. Will need start/end pairing from `raw_events.csv` for processing vs. waiting time |
 | C — Automation Scoring | Not started | |
 | D — Business Case & ROI | Not started | |
 | E — Organizational Network | Not started | Resource data is complete. 5 resources (User_145–149) exist only in non-`complete` transitions |
@@ -146,6 +152,7 @@ Exact stopping point: pre-merge checkpoint passed and logged; working tree clean
 - 2026-09-13 — Optional `outcome` column filled from each case's last terminal application state (A_Pending/A_Denied/A_Cancelled → pending/denied/cancelled; NULL for 98 open cases). `cost` stays NULL: BPI 2017 has no per-event cost.
 - 2026-09-13 — Added `psycopg[binary]` (the driver for the PostgreSQL already in the tech stack) and an `ingestion_run` audit table (tech stack: Postgres stores "past decision/audit runs").
 - 2026-09-13 — Pre-commit runs every test except `integration` (real-data, ~16 s); integration tests run at each checkpoint.
+- 2026-09-13 — Token-replay fitness is the standard two-term formula 0.5(1 − m/c) + 0.5(1 − r/p) (Rozinat and van der Aalst 2008), not the single ratio 02-TECH-STACK suggests (the spec asks for a justified choice). Reason: missing and remaining deviations are scored separately so neither dilutes the other, and results match the standard definition. Activities absent from the reference count as one missing plus one remaining token.
 - 2026-09-13 — Module B uses a formal labelled Petri net (places, transitions, markings) rather than the simplified "graph with required order" that 02-TECH-STACK also allows. Reason: missing/remaining tokens need places to refer to; restriction: no silent transitions.
 - 2026-09-13 — Reference selection offers a third strategy, "most frequent variant for an outcome", beside the two in 01-REQUIREMENTS. Reason: the open question about the cancellation path; it is an option only, and the function has no default until Ved decides.
 - 2026-09-13 — Process-map layout is hand-written (breadth-first stages plus barycenter crossing reduction) and computed in the backend. Reason: 02-TECH-STACK lists only force-directed graph libraries, which scatter a left-to-right process map; layered layout libraries (dagre, elkjs) are not in the stack. The map and histogram are hand-drawn SVG, so no chart or graph package was installed even though Recharts and react-force-graph are allowed.
