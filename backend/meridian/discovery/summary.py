@@ -67,6 +67,15 @@ def format_duration(seconds: float) -> str:
     return f"{seconds / 86_400:.1f} days"
 
 
+def format_measure(value: float) -> str:
+    """Render a dependency or loop measure with three decimals, never as a certain-looking 1.000.
+
+    Why: every heuristic-miner measure is strictly below 1 by construction (the +1 in each
+    denominator), so printing 0.99987 as "1.000" would claim a certainty the evidence cannot give.
+    """
+    return ">0.999" if value >= 0.9995 else f"{value:.3f}"
+
+
 def _plural(count: int, singular: str, plural: str) -> str:
     """Return "1 variant" / "2 variants" with thousands separators."""
     return f"{count:,} {singular if count == 1 else plural}"
@@ -263,7 +272,7 @@ def _model_section(inputs: DiscoveryInputs) -> str:
             (
                 edge.frequency,
                 f"- `{edge.source}` repeats immediately: {repeats} "
-                f"(length-one loop, measure {edge.dependency:.3f})",
+                f"(length-one loop, measure {format_measure(edge.dependency)})",
             )
         )
     two_loops = net.edges[net.edges[KIND] == LENGTH_TWO_LOOP]
@@ -278,8 +287,8 @@ def _model_section(inputs: DiscoveryInputs) -> str:
         loops.append(
             (
                 forward + backward,
-                f"- `{a}` ⇄ `{b}`: {forward:,} forward, {backward:,} back "
-                f"(length-two loop, measure {measure:.3f})",
+                f"- `{a}` ⇄ `{b}`: {a} → {b} {forward:,}, {b} → {a} {backward:,} "
+                f"(length-two loop, measure {format_measure(measure)})",
             )
         )
     if loops:

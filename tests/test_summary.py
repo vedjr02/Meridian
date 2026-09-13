@@ -11,7 +11,12 @@ from test_heuristic_net import LOG as LOOP_LOG
 from meridian.discovery.cycle_time import case_statistics
 from meridian.discovery.dfg import build_dfg
 from meridian.discovery.heuristic_miner import mine_heuristic_net
-from meridian.discovery.summary import DiscoveryInputs, format_duration, render_summary
+from meridian.discovery.summary import (
+    DiscoveryInputs,
+    format_duration,
+    format_measure,
+    render_summary,
+)
 from meridian.discovery.variants import analyze_variants
 from meridian.discovery.visualize import dfg_to_mermaid
 from meridian.ingestion import schema
@@ -118,8 +123,15 @@ def test_loops_are_listed_as_rework_leads() -> None:
     """Loop log from the model tests: A and B loop (40 forward, 10 back); C repeats 10 times."""
     text = render_summary(make_inputs(LOOP_LOG))
 
-    assert "- `A` ⇄ `B`: 40 forward, 10 back (length-two loop, measure 0.952)" in text
+    assert "- `A` ⇄ `B`: A → B 40, B → A 10 (length-two loop, measure 0.952)" in text
     assert "- `C` repeats immediately: 10 times (length-one loop, measure 0.909)" in text
+
+
+def test_measures_never_print_as_certain() -> None:
+    """Measures are strictly below 1, so 0.99987 must not be shown as 1.000."""
+    assert format_measure(0.99987) == ">0.999"
+    assert format_measure(0.9994) == "0.999"
+    assert format_measure(0.952381) == "0.952"
 
 
 def test_summary_is_deterministic() -> None:
