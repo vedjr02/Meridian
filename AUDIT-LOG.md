@@ -4,6 +4,27 @@ Checkpoint entries per `06-AUDIT-PROTOCOL.md`. Newest first.
 
 ---
 
+## 2026-09-13 — Session 3 — End of Week 2 Day 13 checkpoint (branch `module-b-conformance`, HEAD `4d293a7`)
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Full test suite incl. integration | **Pass** — 256 passed in 51.5 s |
+| 2 | Linters/typecheck | **Pass** — `ruff check`, `ruff format --check`, `eslint`, `tsc` clean |
+| 3 | Requirements re-read: Module B req. 5 and acceptance, Day 13 plan | "Written diagnostic report with specific, quantified findings, every claim citing a number": **pass for the generator** — `render_diagnostic_report` uses fixed templates only (deterministic, no LLM, per 02-TECH-STACK and the Day 13 plan), with a test that each answer contains numbers. **Acceptance ("the report can answer, with numbers, % deviating, costliest transition, total rework time")**: the generator produces all three, verified against a hand-derived log (75.0% deviating, log fitness 0.708, D → E 24.0% of time, 15.5 case-hours of rework), and a preview on BPI 2017 was generated in the scratchpad and read end to end (93.0% / 0.576 under the literal reference; `A_Complete → A_Cancelled` 31.9%; rework 21.7%). **Not yet published**: `python -m meridian.conformance --reference ...` has not been run into `data/processed/` (0 Module B files there), because the reference model is Ved's decision. |
+| 4 | Scope drift | **Pass, documented** — the single Module B command now also writes bottleneck and rework tables and the report; the report adds caveats (reference dependence, rework-as-renegotiation, attribution rule, wait includes processing). Logged in `07-PROGRESS-STATE.md`. |
+| 5 | Hand-implemented list / LLM rule | **Pass** — no LLM, conformance or process-mining library. |
+| 6 | Git authorship | **Pass** — all non-merge commits `Vedjr02`, 0 co-author trailers, no NUL bytes. |
+
+**Failed → fixed**
+- A report test's filter for answer lines also matched a bold section heading; the test was
+  wrong, and was narrowed to the three numbered answers.
+- Wording found while deriving expected text by hand: totals under a day printed as "0 case-days"
+  (now case-hours), "1 occurrences" (now pluralised), "classified not classified", and a no-rework
+  log printing medians of nothing (now a plain sentence).
+- Several E501 line-length failures.
+
+---
+
 ## 2026-09-13 — Session 3 — End of Week 2 Day 12 checkpoint (branch `module-b-conformance`, HEAD `2b59bd5`)
 
 | # | Check | Result |
