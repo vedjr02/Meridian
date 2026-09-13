@@ -103,7 +103,7 @@ export type DiscoveryData = {
 
 export type DiscoveryLoadResult =
   | { status: "ok"; data: DiscoveryData }
-  | { status: "missing"; message: string; missing: string[] }
+  | { status: "missing"; missing: string[] }
   | { status: "error"; message: string };
 
 /** Raised when the API reports that discovery outputs do not exist yet (an expected state). */
@@ -146,23 +146,49 @@ function describeFailure(error: unknown): string {
  *
  * Why `connection()` first: without it, Next.js would run these fetches during `next build` and
  * bake whatever the API returned then into a static page, or fail the build if the API is down.
+ *
+ * Why `allSettled` rather than `all`: `all` stops at the first failure, so the empty state would
+ * list only one endpoint's missing files. Every request is awaited, missing files are merged, and
+ * a genuine error (API down, unexpected status) takes precedence over "not computed yet".
  */
 export async function loadDiscovery(): Promise<DiscoveryLoadResult> {
   await connection();
-  try {
-    const [overview, processMap, variants, histogram] = await Promise.all([
-      getJson<Overview>("/api/discovery/overview"),
-      getJson<ProcessMap>("/api/discovery/process-map"),
-      getJson<VariantList>("/api/discovery/variants?limit=25"),
-      getJson<Histogram>("/api/discovery/cycle-time/histogram"),
-    ]);
-    return { status: "ok", data: { overview, processMap, variants, histogram } };
-  } catch (error) {
-    if (error instanceof MissingOutputsError) {
-      return { status: "missing", message: error.message, missing: error.missing };
-    }
+  const [overview, processMap, variants, histogram] = await Promise.allSettled([
+    getJson<Overview>("/api/discovery/overview"),
+    getJson<ProcessMap>("/api/discovery/process-map"),
+    getJson<VariantList>("/api/discovery/variants?limit=25"),
+    getJson<Histogram>("/api/discovery/cycle-time/histogram"),
+  ]);
+
+  const failures = [overview, processMap, variants, histogram].flatMap((result) =>
+    result.status === "rejected" ? [result.reason as unknown] : [],
+  );
+  const error = failures.find((reason) => !(reason instanceof MissingOutputsError));
+  if (error !== undefined) {
     return { status: "error", message: describeFailure(error) };
   }
+  if (failures.length > 0) {
+    const missing = new Set(failures.flatMap((reason) => (reason as MissingOutputsError).missing));
+    return { status: "missing", missing: [...missing].sort() };
+  }
+
+  if (
+    overview.status === "fulfilled" &&
+    processMap.status === "fulfilled" &&
+    variants.status === "fulfilled" &&
+    histogram.status === "fulfilled"
+  ) {
+    return {
+      status: "ok",
+      data: {
+        overview: overview.value,
+        processMap: processMap.value,
+        variants: variants.value,
+        histogram: histogram.value,
+      },
+    };
+  }
+  return { status: "error", message: "unexpected loading state" };
 }
 
 export const apiUrl = API_URL;

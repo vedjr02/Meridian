@@ -18,13 +18,12 @@ export default async function DiscoveryPage() {
   if (result.status === "missing") {
     return (
       <StateMessage tone="empty" title="No process discovery results yet">
-        <p>{result.message}</p>
         <p>
           From the repository root, run <code>.venv/bin/python -m meridian.discovery</code>. It
           ingests the raw event log if needed, then writes the process map, mined model, variant
           table and cycle-time summary this page displays.
         </p>
-        <p>Missing: {result.missing.join(", ")}</p>
+        <p>Files not produced yet: {result.missing.join(", ")}</p>
       </StateMessage>
     );
   }
