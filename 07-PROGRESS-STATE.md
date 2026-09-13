@@ -7,7 +7,7 @@
 
 ## Current phase
 
-`Week 2, Day 13 — done (diagnostic report generator and single Module B command). Next: Ved decides the reference model → run `python -m meridian.conformance --reference ...` into data/processed/ → Week 2, Day 14 — Module B frontend and pre-Week-3 checkpoint.`
+`Week 2, Day 13 — done, and Ved's lifecycle and reference decisions are applied; Module B outputs are published in data/processed/. Next: Week 2, Day 14 — Module B API + frontend, then the pre-Week-3 checkpoint and PR.`
 
 Active branch: `module-b-conformance`, created from `main` after Ved merged PR #3 (all of Module A
 is in `main`). Pushed. Never commit to `main` directly.
@@ -96,7 +96,7 @@ is in `main`). Pushed. Never commit to `main` directly.
 - [x] `replay_log(event_log, net)` → `LogReplay` (per-case rows; `fitting_cases`, `deviating_share`, pooled `log_fitness`, `case_fitness_summary()`); each distinct sequence replayed once — `backend/meridian/conformance/replay.py` — `tests/test_replay_log.py`
 - [x] Command `python -m meridian.conformance --reference {most_frequent_variant|most_frequent_variant_for_outcome|documented} [--outcome X] [--documented-activity A ...]` → `conformance_cases.csv`, `conformance_summary.json` — `backend/meridian/conformance/pipeline.py` — `tests/test_conformance_pipeline.py`
 - [x] Both candidate references replayed on the real log as evidence; results in `08-OPEN-QUESTIONS.md`
-- [ ] **Waiting on Ved**: run the command into `data/processed/` with the chosen reference
+- [x] Run the command into `data/processed/` with the chosen reference (done after Ved's decision; see Day 13)
 - [x] Day 10 checkpoint logged in `AUDIT-LOG.md` (222 tests, all green)
 
 ## Day 11 checklist (session 3)
@@ -104,7 +104,7 @@ is in `main`). Pushed. Never commit to `main` directly.
 - [x] `transition_occurrences(event_log)` extracted in `backend/meridian/discovery/dfg.py` (per-occurrence elapsed time, shared with `build_dfg`)
 - [x] `analyze_bottlenecks(event_log)` → `BottleneckAnalysis` (per transition: occurrences, cases, total and share of time, mean, Q1/p50/Q3/p90/p99/max, quartile dispersion, `kind`; `most_costly()`, `flagged(kind)`) — `backend/meridian/conformance/bottlenecks.py` — `tests/test_bottlenecks.py` (hand-computed, plus cycle-time reconciliation on synthetic and real data)
 - [x] Day 11 checkpoint logged in `AUDIT-LOG.md` (240 tests, all green)
-- [ ] Not yet: a bottleneck command/output file (planned with the Day 13 report generator)
+- [x] Bottleneck output file `bottlenecks.csv`, written by the single Module B command (Day 13)
 
 ## Day 12 checklist (session 3)
 
@@ -116,34 +116,50 @@ is in `main`). Pushed. Never commit to `main` directly.
 - [x] `render_diagnostic_report(DiagnosticInputs)` — deterministic Markdown answering the three acceptance questions, then conformance, bottleneck and rework evidence and caveats — `backend/meridian/conformance/report.py` — `tests/test_diagnostic_report.py`
 - [x] Single Module B command: `python -m meridian.conformance --reference STRATEGY [--outcome X]` → `run_diagnosis` writes `conformance_cases.csv`, `conformance_summary.json`, `bottlenecks.csv`, `rework_cases.csv`, `rework_activities.csv`, `diagnostic_report.md` — `backend/meridian/conformance/pipeline.py`
 - [x] Real-log preview rendered in the scratchpad and reviewed (not published)
-- [ ] **Waiting on Ved**: reference-model decision, then run the command into `data/processed/`
 - [x] Day 13 checkpoint logged in `AUDIT-LOG.md` (256 tests, all green)
 
-## Real-data facts established (BPI 2017, measured session 2)
+## Decisions applied (session 3, after Day 13)
 
+- [x] Ved chose reference **Option A, most frequent variant** and lifecycle **Option 2, start where recorded, otherwise complete**. Both are logged with his reasoning in `08-OPEN-QUESTIONS.md`.
+- [x] `LifecyclePolicy` enum (`start_else_complete` default, `complete`, `all`) is in `backend/meridian/ingestion/lifecycle.py`. It is selected by env `MERIDIAN_LIFECYCLE_POLICY` and recorded in `ingestion_report.json`. Summaries, the diagnostic report and `/api/discovery/overview` state the policy that was actually recorded (`recorded_lifecycle_policy`).
+- [x] `python -m meridian.conformance` defaults to `--reference most_frequent_variant`. `select_reference_model` itself still requires an explicit strategy. The summary and report add `reference_path_outcomes` (where the cases that follow the reference end).
+- [x] Re-ingested (Postgres ingestion run 2, 561,671 rows) and regenerated Module A. Real-data pins in `tests/test_ingestion_pipeline.py` are updated. Module B is published to `data/processed/` (6 files, including `diagnostic_report.md`).
+- [x] Checkpoint logged in `AUDIT-LOG.md` (258 tests, all green, build passes).
+
+## Real-data facts established (BPI 2017)
+
+Raw log (measured session 2):
 - 31,509 cases, 1,202,267 events, 26 activities, 149 resources. Every event has case id, activity,
   timestamp (all UTC `Z`), resource and lifecycle transition. 0 malformed, 0 out-of-order, 0 nested attributes.
 - Lifecycle: complete 475,306 · suspend 215,402 · schedule 149,104 · start 128,227 · resume 127,160 · ate_abort 85,224 · withdraw 21,844.
-- `complete`-only normalized log (current default): 475,306 events, 31,509 cases, 24 activities, 144 resources.
+- W_ activities record 128,227 starts but 41,862 completes. Beside the completes there are 85,224 `ate_abort` and 21,844 `withdraw` events, against 149,104 scheduled. The worst case is `W_Call after offers`: 31,485 starts, 342 completes. This is why `complete`-only was rejected. `W_Personal Loan collection` and `W_Shortened completion` have no completes at all, so they were invisible under `complete`-only (24 activities rather than 26).
 - Outcomes: pending 17,228 · cancelled 10,431 · denied 3,752 · no terminal state 98. No case reaches two different terminal states.
-- Full ingestion takes ~16 s (parse ~11 s).
-- Variants (`complete`-only log): 5,623 distinct for 31,509 cases; 610 cover 80% of cases; top variant 7.0% of cases; 4,150 single-case variants. **Top 3 variants (5,704 cases) all end cancelled** (see 08-OPEN-QUESTIONS.md). Most common variant among `pending` cases is rank 4 (969 cases).
-- Cycle time (`complete`-only log): p50 19.1 d, p90 35.0 d, p99 59.1 d, mean 21.8 d, max 169.1 d. Most common variant p50 31.7 d against 17.9 d for all others.
-- Rework (`complete`-only log): 16,234 of 31,509 cases (51.5%) repeat an activity; 149,309 case-days = 21.7% of all cycle time sit inside rework loops; per affected case p50 5.8 d, p90 24.6 d. Top: `A_Validating` (11,669 cases), offer creation (8,559 cases; possibly renegotiation, not errors).
-- Bottlenecks (`complete`-only log): costliest transition `A_Complete → A_Cancelled`, 31.9% of all elapsed case-time, median 30.7 d with quartiles 30.5–30.8 d (looks like a fixed cancellation window, i.e. policy rather than capacity); next `A_Complete → A_Validating`, 23.7%, median 7.2 d. Slow threshold 1.0 d. Kinds: 6 uniformly slow, 17 slow and variable, 38 high variance, 31 not flagged, 67 insufficient data.
-- Heuristic net (threshold 0.9, `complete`-only log): 98 edges — 83 causal, 5 length-one loops, 10 length-two-loop edges, 0 best connections; no orphans; mined in 0.3 s. `O_Create Offer ⇄ O_Created` is a length-two loop (multiple offers). Largest rework loop: `A_Incomplete ⇄ A_Validating` (12,282 / 4,427 transitions) — a Module B lead.
-- DFG (`complete`-only log): 443,797 transitions, 159 distinct edges, built in 0.7 s. All 31,509 cases start with `A_Create Application`. Top edge `O_Create Offer -> O_Created` (42,995). Early bottleneck signal for Module B: `A_Complete -> A_Validating` median 7.2 d, mean 8.9 d.
+- Full ingestion takes ~16–19 s (parse ~11 s).
 - The raw XES is one line with no newlines — never grep or line-read it.
+
+**Published analysis: `start_else_complete` log, measured session 3.** The earlier `complete`-only figures are kept in `AUDIT-LOG.md` (Days 2–13).
+
+Log and discovery:
+- **Normalized log:** 561,671 events (433,444 A_/O_ completes + 128,227 W_ starts), 31,509 cases, 26 activities, 146 resources. 8 W_ activities are represented by their start events.
+- **Variants:** 4,047 distinct; 207 cover 80% of cases; 2,924 single-case variants. The **top variant covers 3,656 cases (11.6%), has 12 activities and ends cancelled in 100% of cases**. Ved decided to report this as a finding.
+- **Cycle time:** p50 19.1 d, p90 35.0 d, p99 59.2 d, mean 21.9 d, max 169.1 d. The most common variant has p50 31.8 d, against 17.1 d for all others.
+- **DFG:** 530,162 transitions (= events − cases), 166 distinct edges. All cases start with `A_Create Application`. Top edges: `O_Create Offer → O_Created` (42,995) and `W_Validate application → A_Validating` (38,816).
+- **Heuristic net (threshold 0.9):** 111 edges: 89 causal, 10 length-one loops (5 O_, 5 W_), 11 length-two-loop edges, 1 best connection. Loops include `O_Create Offer ⇄ O_Created`, `A_Validating ⇄ W_Validate application` and `A_Complete ⇄ W_Call after offers`.
+
+Module B, reference = most frequent variant:
+- **Conformance:** 88.4% of cases deviate (27,853 of 31,509). Log fitness 0.562. Case fitness p10 0.368 / p50 0.533 / p90 1.000, mean 0.607. Mean fitness by outcome: cancelled 0.873, no terminal state 0.672, denied 0.514, pending 0.465.
+- **Bottlenecks:** the costliest transition is `A_Complete → A_Cancelled`: 218,926 case-days (31.8% of elapsed time), 8,004 occurrences, median 30.7 d, quartiles 30.5–30.8 d, uniformly slow. That looks like a fixed cancellation window (policy rather than capacity). Next is `A_Complete → W_Validate application` at 23.6%, median 7.1 d, uniformly slow. The slow threshold is 23.2 h. Kinds: 7 uniformly slow, 17 slow and variable, 51 high variance, 21 not flagged, 70 insufficient data.
+- **Rework:** 16,537 cases (52.5%) repeat an activity. 148,282 case-days (21.5% of cycle time) sit inside loops; per affected case p50 5.2 d, p90 24.0 d. Most repeated: `W_Validate application` (11,839 cases), `A_Validating` (11,669), offer creation (8,559; possibly renegotiation, not errors).
 
 ## Status by module
 
 | Module | Status | Notes |
 |---|---|---|
 | A — Process Discovery | **Complete** (Week 1): command-line acceptance met, frontend `/discovery` built and verified | Awaiting PR for last 4 commits |
-| B — Conformance & Diagnosis | Days 8–13 done (Petri net, reference selection, replay, bottlenecks, rework, report, single command) | Needs reference decision to publish outputs; then Day 14 frontend. Published conformance run waits for the reference decision. Real-data reference choice blocked on open question. Will need start/end pairing from `raw_events.csv` for processing vs. waiting time |
+| B — Conformance & Diagnosis | Days 8–13 done; command-line acceptance **met on real data** (`data/processed/diagnostic_report.md`) | Next: Day 14 API + frontend, pre-Week-3 checkpoint, PR. Separating processing from waiting time would need start/complete pairing (logged as future work in 08) |
 | C — Automation Scoring | Not started | |
 | D — Business Case & ROI | Not started | |
-| E — Organizational Network | Not started | Resource data is complete. 5 resources (User_145–149) exist only in non-`complete` transitions |
+| E — Organizational Network | Not started | Resource data is complete: 149 resources raw, 146 in the published log |
 | F — What-If Simulation | Not started | |
 | G — NL Query Layer | Not started (lowest priority) | |
 
@@ -154,24 +170,45 @@ on `module-b-conformance`: Petri net, reference selection, token replay, full-lo
 aggregates, bottleneck analysis, rework analysis, diagnostic report and the single Module B command,
 with a checkpoint after each day. All commits authored by Vedjr02 with no AI co-author trailers.
 
-Exact stopping point: Day 13 checkpoint passed and logged; working tree clean on
-`module-b-conformance`, pushed. Nothing mid-change. No Module B outputs in `data/processed/` yet.
+Ved then decided both open questions: reference = most frequent variant; lifecycle =
+`start_else_complete`. Both were applied across ingestion, discovery, conformance, API and frontend.
+The log was re-ingested, Module A regenerated, and real-data tests re-pinned. Module B was published
+and its checkpoint logged.
+
+Exact stopping point: decisions checkpoint passed and logged; README, AUDIT-LOG and this file
+updated; working tree clean on `module-b-conformance`, pushed. Nothing mid-change. `data/processed/`
+holds current Module A and Module B outputs (gitignored; regenerate with the two commands in README).
 
 **Start here next session:**
-1. `08-OPEN-QUESTIONS.md` still has **two open questions for Ved**: the reference model (with
-   real-log evidence for both candidates) and lifecycle transitions. Do not choose the reference.
-2. Once the reference is decided: `.venv/bin/python -m meridian.conformance --reference <strategy>
-   [--outcome pending]`, read `data/processed/diagnostic_report.md`, and verify the Module B acceptance
-   questions are answered.
-3. Then Day 14: Module B frontend (03-UIUX-RULES.md §3: lead with headline stat cards such as "X% of
-   cases deviate" and "Y days added by rework" before any chart; bottleneck chart; rework findings)
-   plus read-only API endpoints over the Module B outputs, like `/api/discovery/*`. Then the
-   pre-Week-3 checkpoint and a PR from `module-b-conformance` into `main`.
-4. To run the frontend: `.venv/bin/uvicorn meridian.api.main:app` and
+1. `08-OPEN-QUESTIONS.md` has no open questions. It has one future-work entry: full lifecycle and
+   duration modelling.
+2. Day 14, backend: read-only API endpoints over the Module B outputs, mirroring
+   `backend/meridian/api/discovery.py`:
+   - serve precomputed files and never recompute;
+   - return a structured 404 that names `python -m meridian.conformance`;
+   - serve fresh data after a rerun.
+   Sources: `conformance_summary.json`, `bottlenecks.csv`, `rework_cases.csv`,
+   `rework_activities.csv`.
+3. Day 14, frontend: a `/diagnosis` page (03-UIUX-RULES.md §3):
+   - start with headline stat cards before any chart ("88.4% of cases deviate", "148,282 case-days
+     inside rework loops", costliest transition);
+   - then a bottleneck chart showing median and middle half per transition, coloured by kind;
+   - then rework findings;
+   - state the reference path and that it ends cancelled.
+   Also add navigation between `/discovery` and `/diagnosis`.
+4. Then the pre-Week-3 checkpoint and a PR from `module-b-conformance` into `main`. Ved opens it,
+   because `gh` is not authenticated.
+5. To run the frontend: `.venv/bin/uvicorn meridian.api.main:app` and
    `npm --prefix frontend run dev`, then open http://localhost:3000.
 
 ## Scope decisions
 
+- 2026-09-13 — **Lifecycle policy `start_else_complete`** (Ved's decision; reasoning in 08).
+  - Each activity is represented by its start events if it records any, otherwise by its completes. This is decided per activity from the data, not from a hard-coded W_ list.
+  - `LifecyclePolicy` replaces the earlier free-form transition list (`MERIDIAN_LIFECYCLE_TRANSITIONS` → `MERIDIAN_LIFECYCLE_POLICY`) so only coherent choices are possible.
+  - Full start/complete pairing (processing vs. waiting time) is future work: every module would need to handle pairs, not just ingestion.
+- 2026-09-13 — **Reference model = most frequent variant** (Ved's decision; reasoning in 08). It is the default of `python -m meridian.conformance`, and the other strategies stay available as options. The report and summary add `reference_path_outcomes`, so a reader sees that the modal path ends cancelled rather than having it routed around.
+- 2026-09-13 — The lifecycle change was made on `module-b-conformance` rather than a separate branch, because Module B's published numbers depend on it. It touches Module A code already merged to `main`; the Week 2 PR carries the change.
 - 2026-09-13 — Dataset: BPI Challenge 2017 (not 2012), chosen by Ved; larger resource population helps Module E.
 - 2026-09-13 — Build plan said "clone the existing repo"; the remote was empty, so the repo was initialised locally instead (Ved approved).
 - 2026-09-13 — Added a checksum-pinned downloader (beyond "a script that downloads it") so every run starts from byte-identical input — supports reproducibility, no scope expansion.
@@ -201,7 +238,8 @@ Exact stopping point: Day 13 checkpoint passed and logged; working tree clean on
 
 ## Known issues / technical debt
 
-- **Open decision**: lifecycle transitions kept in the normalized log (08-OPEN-QUESTIONS.md). Default `complete` distorts W_ workflow activities; switch via `MERIDIAN_LIFECYCLE_TRANSITIONS` or code change once decided, then update the pinned counts in `tests/test_ingestion_pipeline.py`.
+- Under `start_else_complete`, a wait into a started activity ends when work begins. A case ending with a started activity also leaves out that activity's own processing time. Both points are stated in every summary and report. Changing the policy means re-ingesting, regenerating both modules, and re-pinning `tests/test_ingestion_pipeline.py`.
+- Older scope-decision entries below that describe the reference as undecided, or `complete` as the default, are historical. The two decision entries at the top of the list supersede them.
 - Out-of-order detection flags events earlier than the running maximum in their case. One bogus far-future timestamp would flag every later event in that case. Real log has 0, so not addressed; revisit if a future dataset shows clusters of out-of-order exclusions.
 - `count_raw_events` would count an `<event` inside an XML comment (documented limitation; XES writers don't emit them).
 - Homebrew is at `/opt/homebrew/bin/brew` and is not on PATH in non-login shells; Postgres binaries are at `/opt/homebrew/opt/postgresql@18/bin`.

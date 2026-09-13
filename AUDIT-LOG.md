@@ -4,6 +4,34 @@ Checkpoint entries per `06-AUDIT-PROTOCOL.md`. Newest first.
 
 ---
 
+## 2026-09-13 — Session 3 — Lifecycle and reference decisions applied; Module B published (branch `module-b-conformance`, HEAD `f6318ab`)
+
+Unit of work: Ved's two decisions in `08-OPEN-QUESTIONS.md`: reference = most frequent variant
+(Option A), lifecycle = `start_else_complete` (Option 2). Then re-ingest, regenerate Module A,
+re-pin real-data tests and publish Module B.
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Full test suite incl. integration | **Pass** — 258 passed in 53.4 s (all real-data tests ran, none skipped) |
+| 2 | Linters/typecheck/build | **Pass** — `ruff check`, `ruff format --check`, `eslint`, `tsc`, `next build` clean |
+| 3 | Requirements re-read: Module A req. 1, Module B req. 1 and acceptance | Normalization still accounts for every event: 561,671 kept + 640,596 filtered by lifecycle + 0 excluded = 1,202,267 parsed; the policy and the 8 activities represented by start are recorded in `ingestion_report.json` and printed by the command. Module B req. 1 ("most frequent path as the reference"): **pass**. It is the command default, and the library function still requires an explicit strategy. **Module B acceptance: pass on real data.** `data/processed/diagnostic_report.md` answers all three questions with numbers: 88.4% of cases deviate (log fitness 0.562); `A_Complete → A_Cancelled` costs the most, at 31.8% of elapsed time; rework accounts for 148,282 case-days (21.5% of cycle time). Postgres `event_log` holds 561,671 rows (ingestion run 2). |
+| 4 | Scope drift | **Pass, documented** — `LifecyclePolicy` replaces the free-form transition list; the report states where the cases that follow the reference path end (`reference_path_outcomes`). Full start/complete duration modelling is logged as future work, not built. Both are logged in `07-PROGRESS-STATE.md`. |
+| 5 | Hand-implemented list / LLM rule | **Pass** — no process-mining, conformance or LLM library; forbidden-import scan clean. |
+| 6 | Git authorship | **Pass** — 131 commits, all non-merge commits `Vedjr02`, 0 co-author trailers, no NUL bytes in tracked files. |
+
+**Effect of the lifecycle change on real data** (`complete`-only → `start_else_complete`):
+- **Events and variants.** Events go from 475,306 to 561,671. Variants drop from 5,623 to 4,047, and 207 variants now cover 80% of cases (was 610). The top variant rises from 7.0% to 11.6% of cases.
+- **Modal path.** The modal path still ends cancelled in 100% of its 3,656 cases. As Ved asked, this is reported as a finding.
+- **Cycle time.** p50 stays at 19.1 d, p99 moves from 59.1 d to 59.2 d, and the mean from 21.8 d to 21.9 d. These shift only slightly, because a case's first and last events rarely change.
+- **Rework.** Share of cycle time goes from 21.7% to 21.5%, and affected cases from 51.5% to 52.5%. `W_Validate application` is now visible as the most repeated activity (11,839 cases).
+- **Mined model.** It now has 111 edges (was 98), including 10 length-one loops (was 5). The 5 new loops are all W_ activities started twice in a row. The cause (for example an abort followed by a restart) has not been checked.
+
+**Failed → fixed**
+- A test fixture still used the old `lifecycle_transitions` setting name.
+- The README still documented `MERIDIAN_LIFECYCLE_TRANSITIONS` and "no default" reference. The `select_reference_model` docstring still called the reference an open question. All were corrected after the checkpoint scan.
+
+---
+
 ## 2026-09-13 — Session 3 — End of Week 2 Day 13 checkpoint (branch `module-b-conformance`, HEAD `4d293a7`)
 
 | # | Check | Result |
