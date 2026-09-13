@@ -26,6 +26,10 @@ brew install postgresql@18 && brew services start postgresql@18
 # Ingest: parse the XES, normalize, write data/processed/, load PostgreSQL (~16 s)
 .venv/bin/python -m meridian.ingestion          # add --no-db to skip PostgreSQL
 
+# Process discovery (Module A), each step runnable on its own
+.venv/bin/python -m meridian.discovery.dfg                # directly-follows graph -> dfg_edges.csv
+.venv/bin/python -m meridian.discovery.heuristic_miner    # mined model -> heuristic_net.json
+
 # Tests: fast suite (what the pre-commit hook runs), then everything incl. real-data tests
 .venv/bin/pytest -m "not integration"
 .venv/bin/pytest
@@ -47,6 +51,7 @@ All settings live in `backend/meridian/config.py` and can be overridden by envir
 | `MERIDIAN_DATABASE_URL` | `postgresql://localhost:5432/meridian` | Database for real runs |
 | `MERIDIAN_TEST_DATABASE_URL` | `postgresql://localhost:5432/meridian_test` | Database tests may wipe |
 | `MERIDIAN_LIFECYCLE_TRANSITIONS` | `complete` | Transitions kept in the normalized log (`all` keeps every one) |
+| `MERIDIAN_DEPENDENCY_THRESHOLD` | `0.9` | Evidence an edge needs to enter the mined model, strictly between 0 and 1 |
 
 ## Layout
 
@@ -65,6 +70,8 @@ All settings live in `backend/meridian/config.py` and can be overridden by envir
 | `data/processed/raw_events.csv` | Every parsed event, all lifecycle transitions |
 | `data/processed/event_log.csv` | Normalized log: `case_id, event_index, activity, timestamp, resource, cost, outcome` |
 | `data/processed/ingestion_report.json` | Counts kept, filtered and excluded, by reason |
+| `data/processed/dfg_edges.csv` | Directly-follows edges: frequency, case frequency, median and mean duration |
+| `data/processed/heuristic_net.json` | Mined model: start/end activities and edges tagged by the rule that admitted them |
 | PostgreSQL `event_log`, `ingestion_run` | Normalized log, and one audit row per ingestion run |
 
 ## Data
