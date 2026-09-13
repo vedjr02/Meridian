@@ -4,6 +4,21 @@ Checkpoint entries per `06-AUDIT-PROTOCOL.md`. Newest first.
 
 ---
 
+## 2026-09-13 — Session 3 — End of Week 2 Day 9 checkpoint (branch `module-b-conformance`, HEAD `a0b8249`)
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Full test suite incl. integration | **Pass** — 211 passed in 47.8 s |
+| 2 | Linters/typecheck | **Pass** — `ruff check`, `ruff format --check`, `eslint`, `tsc` clean |
+| 3 | Requirements re-read: Module B req. 2, 02-TECH-STACK §2, Day 9 plan | Replay each case against the reference; count missing tokens (skipped required steps) and remaining tokens (extra or unexpected steps); fitness per case: **pass for a single case** — `replay_trace`, with the formula and its justification in the `ReplayResult.fitness` docstring. "Unit tests with known expected fitness for hand-crafted perfect, one-deviation and very-different cases": **pass** — `tests/test_replay.py`, eight hand-traced cases (perfect 1.0; skipped 0.75; swapped 0.8; repeated 0.833; unknown step 0.833; truncated 0.667; very different 0.0; empty 0.0), plus a 500-trace seeded check of token conservation (r − m = p − c) and fitness bounds. Aggregate fitness and the full-dataset run are Day 10. |
+| 4 | Scope drift | **Pass, documented** — fitness uses the standard two-term token-replay formula rather than the single ratio suggested in 02-TECH-STACK (the spec invites a justified choice); unknown activities count as one missing plus one remaining token. Both logged in `07-PROGRESS-STATE.md`. |
+| 5 | Hand-implemented list | **Pass** — replay written by hand; no conformance or Petri-net library. |
+| 6 | Git authorship | **Pass** — all non-merge commits `Vedjr02`, 0 co-author trailers, no NUL bytes. |
+
+**Failed → fixed**: one E501 in a test comment.
+
+---
+
 ## 2026-09-13 — Session 3 — End of Week 2 Day 8 checkpoint (branch `module-b-conformance`, HEAD `904f16e`)
 
 | # | Check | Result |
