@@ -29,6 +29,7 @@ from meridian.discovery.summary import DiscoveryInputs, format_duration, render_
 from meridian.discovery.variants import analyze_variants
 from meridian.discovery.visualize import dfg_to_mermaid
 from meridian.ingestion.io import read_event_log_csv
+from meridian.ingestion.lifecycle import LifecyclePolicy
 from meridian.ingestion.pipeline import RowCountMismatchError, run_ingestion
 from meridian.ingestion.store import StoredRowCountMismatchError
 
@@ -49,19 +50,18 @@ class DiscoveryResult:
     cycle_time: DistributionSummary
 
 
-def lifecycle_description(settings: Settings) -> str:
-    """Describe which lifecycle transitions the event log on disk contains.
+def recorded_lifecycle_policy(settings: Settings) -> LifecyclePolicy | None:
+    """Return the lifecycle policy the event log on disk was normalized with, if recorded.
 
     Why the ingestion report rather than the current setting: the CSV may have been written under
-    a different `MERIDIAN_LIFECYCLE_TRANSITIONS` than the one set now, and the summary must
-    describe the data it was actually computed from.
+    a different `MERIDIAN_LIFECYCLE_POLICY` than the one set now, and every summary must describe
+    the data it was actually computed from. None means no usable ingestion report exists.
     """
     try:
         report = json.loads(settings.ingestion_report_json.read_text())
-        kept = report["normalization"]["lifecycle_kept"]
-    except (FileNotFoundError, KeyError, json.JSONDecodeError):
-        return "unknown (no ingestion report found)"
-    return "all" if kept is None else ", ".join(kept)
+        return LifecyclePolicy(report["normalization"]["lifecycle_policy"])
+    except (FileNotFoundError, KeyError, ValueError):
+        return None
 
 
 def run_discovery(
@@ -91,7 +91,7 @@ def run_discovery(
             variants=variants,
             case_stats=stats,
             diagram=diagram,
-            lifecycle_kept=lifecycle_description(settings),
+            lifecycle=recorded_lifecycle_policy(settings),
             coverage_share=COVERAGE_SHARE,
         )
     )

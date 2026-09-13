@@ -20,6 +20,7 @@ from meridian.discovery.summary import (
 from meridian.discovery.variants import analyze_variants
 from meridian.discovery.visualize import dfg_to_mermaid
 from meridian.ingestion import schema
+from meridian.ingestion.lifecycle import LifecyclePolicy
 
 SPEC = [("S A B E", 6, 2, "approved"), ("S A E", 3, 1, "rejected"), ("S B E", 1, 10, None)]
 
@@ -40,7 +41,9 @@ def build_log(spec: list[tuple[str, int, float, str | None]]) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=list(schema.NORMALIZED_COLUMNS))
 
 
-def make_inputs(log: pd.DataFrame, lifecycle_kept: str = "complete") -> DiscoveryInputs:
+def make_inputs(
+    log: pd.DataFrame, lifecycle: LifecyclePolicy | None = LifecyclePolicy.START_ELSE_COMPLETE
+) -> DiscoveryInputs:
     """Run every discovery step on `log` and bundle the results for the renderer."""
     dfg = build_dfg(log)
     variants = analyze_variants(log)
@@ -51,7 +54,7 @@ def make_inputs(log: pd.DataFrame, lifecycle_kept: str = "complete") -> Discover
         variants=variants,
         case_stats=case_statistics(log, variants),
         diagram=dfg_to_mermaid(dfg),
-        lifecycle_kept=lifecycle_kept,
+        lifecycle=lifecycle,
     )
 
 
@@ -68,7 +71,7 @@ def test_duration_formatting_switches_to_hours_below_a_day() -> None:
 def test_header_and_headline_numbers() -> None:
     """Scope line and the 80% coverage headline: 8 of 10 cases need variants of 6 and 3 cases."""
     assert "Computed from 36 events in 10 cases across 4 activities" in TEXT
-    assert "(lifecycle transitions kept: complete)" in TEXT
+    assert "(lifecycle rule: start where recorded, otherwise complete)" in TEXT
     assert (
         "**Covering 80% of cases takes 2 of 3 distinct variants (66.7% of all variants).**" in TEXT
     )
@@ -106,17 +109,20 @@ def test_process_map_and_model_sections() -> None:
 
 def test_caveats_cover_lifecycle_happy_path_and_open_cases() -> None:
     """A reader must see what limits every number before quoting it."""
-    assert "Only `complete` lifecycle transitions are in this log." in TEXT
+    assert "Lifecycle rule: start where recorded, otherwise complete." in TEXT
     assert "Its cases end: approved 100%." in TEXT
     assert "1 case has no terminal state (10.0%)" in TEXT
     assert "linear interpolation" in TEXT
 
 
-def test_lifecycle_caveat_is_omitted_when_all_transitions_are_kept() -> None:
-    """The caveat explains a filter; with no filter there is nothing to explain."""
-    text = render_summary(make_inputs(LOG, lifecycle_kept="all"))
+def test_lifecycle_caveat_matches_the_policy_or_says_it_is_unknown() -> None:
+    """Each policy distorts time differently, so the caveat must be the recorded policy's own."""
+    complete_only = render_summary(make_inputs(LOG, lifecycle=LifecyclePolicy.COMPLETE))
+    unknown = render_summary(make_inputs(LOG, lifecycle=None))
 
-    assert "lifecycle transitions are in this log" not in text
+    assert "Lifecycle rule: complete only." in complete_only
+    assert "undercounts human work" in complete_only
+    assert "(lifecycle rule: unknown (no ingestion report found))" in unknown
 
 
 def test_loops_are_listed_as_rework_leads() -> None:

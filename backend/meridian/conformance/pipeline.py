@@ -1,8 +1,8 @@
 """Module B in one command: conformance, bottlenecks, rework and the written diagnostic report.
 
-`python -m meridian.conformance --reference <strategy>` requires the reference strategy to be named.
-Why there is no default: which reference model to use is an open decision (08-OPEN-QUESTIONS.md),
-and it changes every conformance number, so a run must always say what it measured against.
+`python -m meridian.conformance` measures conformance against the most frequent variant overall,
+as 01-REQUIREMENTS.md specifies and Ved confirmed on 2026-09-13 (08-OPEN-QUESTIONS.md); other
+strategies stay available via `--reference`. Every output records which reference was used.
 Bottleneck and rework analysis do not depend on the reference and run in the same command so the
 report is complete.
 """
@@ -25,13 +25,14 @@ from meridian.conformance.reference import (
     ReferenceStrategy,
     select_reference_model,
 )
-from meridian.conformance.replay import FITNESS, LogReplay, replay_log
+from meridian.conformance.replay import FITNESS, FITS, LogReplay, replay_log
 from meridian.conformance.report import DiagnosticInputs, render_diagnostic_report
 from meridian.conformance.rework import ReworkAnalysis, analyze_rework
-from meridian.discovery.pipeline import lifecycle_description
+from meridian.discovery.pipeline import recorded_lifecycle_policy
 from meridian.discovery.summary import NO_OUTCOME, format_duration
 from meridian.ingestion import schema
 from meridian.ingestion.io import read_event_log_csv
+from meridian.ingestion.lifecycle import LifecyclePolicy
 
 FITNESS_FORMULA = "0.5 * (1 - missing / consumed) + 0.5 * (1 - remaining / produced)"
 
@@ -55,6 +56,11 @@ class DiagnosisResult:
     rework: ReworkAnalysis
     report: str
     outputs: dict[str, Path]
+
+
+def _policy_value(policy: LifecyclePolicy | None) -> str | None:
+    """JSON value for a recorded lifecycle policy (None when no ingestion report exists)."""
+    return policy.value if policy else None
 
 
 def _load_event_log(settings: Settings) -> pd.DataFrame:
@@ -82,6 +88,28 @@ def _fitness_by_outcome(event_log: pd.DataFrame, replay: LogReplay) -> dict[str,
     labels = labels.where(labels.notna(), NO_OUTCOME)
     means = replay.cases[FITNESS].groupby(labels).mean()
     return {str(label): float(value) for label, value in sorted(means.items())}
+
+
+def _fitting_case_outcomes(event_log: pd.DataFrame, replay: LogReplay) -> dict[str, int]:
+    """Outcome counts of the cases that follow the reference path exactly.
+
+    Why: how the reference path itself ends is a finding in its own right. On BPI 2017's
+    `complete`-only log the modal path ended in cancellation, which Ved asked to be reported rather
+    than routed around.
+    """
+    fitting = replay.cases.loc[replay.cases[FITS], schema.CASE_ID]
+    outcomes = (
+        event_log.drop_duplicates(schema.CASE_ID)
+        .set_index(schema.CASE_ID)[schema.OUTCOME]
+        .astype("object")
+    )
+    labels = fitting.map(outcomes)
+    labels = labels.where(labels.notna(), NO_OUTCOME)
+    counts = labels.value_counts()
+    return {
+        str(label): int(count)
+        for label, count in sorted(counts.items(), key=lambda i: (-i[1], i[0]))
+    }
 
 
 def run_conformance(
@@ -113,7 +141,7 @@ def run_conformance(
             "supporting_cases": reference.supporting_cases,
             "eligible_cases": reference.eligible_cases,
         },
-        "lifecycle_kept": lifecycle_description(settings),
+        "lifecycle_policy": _policy_value(recorded_lifecycle_policy(settings)),
         "fitness_formula": FITNESS_FORMULA,
         "case_count": replay.case_count,
         "fitting_cases": replay.fitting_cases,
@@ -121,6 +149,7 @@ def run_conformance(
         "log_fitness": replay.log_fitness,
         "case_fitness": replay.case_fitness_summary(),
         "mean_case_fitness_by_outcome": _fitness_by_outcome(log, replay),
+        "reference_path_outcomes": _fitting_case_outcomes(log, replay),
     }
 
     settings.processed_dir.mkdir(parents=True, exist_ok=True)
@@ -162,7 +191,7 @@ def run_diagnosis(
     report = render_diagnostic_report(
         DiagnosticInputs(
             dataset_name=settings.dataset.name,
-            lifecycle_kept=lifecycle_description(settings),
+            lifecycle=recorded_lifecycle_policy(settings),
             conformance=conformance.summary,
             bottlenecks=bottlenecks,
             rework=rework,
@@ -211,7 +240,7 @@ def format_result(result: DiagnosisResult) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Command-line entry point: `python -m meridian.conformance --reference STRATEGY [...]`.
+    """Command-line entry point: `python -m meridian.conformance [--reference STRATEGY] [...]`.
 
     Why selection errors return exit code 1 with the message rather than a traceback: an unknown
     outcome or a missing flag is a usage problem the message fully explains.
@@ -221,9 +250,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--reference",
-        required=True,
+        default=ReferenceStrategy.MOST_FREQUENT_VARIANT.value,
         choices=[strategy.value for strategy in ReferenceStrategy],
-        help="how to choose the reference model; there is deliberately no default",
+        help="how to choose the reference model (default: most_frequent_variant, per requirements)",
     )
     parser.add_argument("--outcome", help="outcome for most_frequent_variant_for_outcome")
     parser.add_argument(

@@ -19,7 +19,8 @@ from meridian.conformance.bottlenecks import (
     BottleneckKind,
 )
 from meridian.conformance.rework import ReworkAnalysis
-from meridian.discovery.summary import format_duration
+from meridian.discovery.summary import format_duration, lifecycle_caveat, lifecycle_label
+from meridian.ingestion.lifecycle import LifecyclePolicy
 
 TOP_ROWS = 5
 SECONDS_PER_DAY = 86_400
@@ -59,7 +60,7 @@ class DiagnosticInputs:
     """
 
     dataset_name: str
-    lifecycle_kept: str
+    lifecycle: LifecyclePolicy | None
     conformance: dict[str, Any]
     bottlenecks: BottleneckAnalysis
     rework: ReworkAnalysis
@@ -99,8 +100,9 @@ def _title(inputs: DiagnosticInputs) -> str:
     summary = inputs.conformance
     return (
         f"# Process diagnosis — {inputs.dataset_name}\n\n"
-        f"Computed from {summary['case_count']:,} cases (lifecycle transitions kept: "
-        f"{inputs.lifecycle_kept}). Every figure is computed from the event log; none is estimated."
+        f"Computed from {summary['case_count']:,} cases (lifecycle rule: "
+        f"{lifecycle_label(inputs.lifecycle)}). Every figure is computed from the event log; none "
+        "is estimated."
     )
 
 
@@ -126,7 +128,8 @@ def _answers(inputs: DiagnosticInputs) -> str:
                 f"{summary['log_fitness']:.3f} and the median case fitness is "
                 f"{fitness['p50']:.3f}, "
                 "where 1 means the case follows the reference exactly. "
-                f"Reference: {summary['reference']['description']}"
+                f"Reference: {summary['reference']['description']} "
+                f"{_reference_path_outcomes(summary)}"
             ),
             (
                 "**2. Which single transition costs the most aggregate time?** "
@@ -140,6 +143,21 @@ def _answers(inputs: DiagnosticInputs) -> str:
             _rework_answer(rework, distribution),
         ]
     )
+
+
+def _reference_path_outcomes(summary: dict[str, Any]) -> str:
+    """State how the cases that follow the reference path exactly end.
+
+    Why this is part of the first answer: if the most common path ends in cancellation rather than
+    approval, that is a diagnostic finding about the process itself, and it changes how "deviating
+    from the reference" should be read.
+    """
+    outcomes = summary.get("reference_path_outcomes") or {}
+    total = sum(outcomes.values())
+    if not total:
+        return "No case follows the reference path exactly."
+    mix = ", ".join(f"{label} {count / total:.0%}" for label, count in outcomes.items())
+    return f"The {_plural(total, 'case', 'cases')} following the reference path end: {mix}."
 
 
 def _rework_answer(rework: ReworkAnalysis, distribution: dict[str, float]) -> str:
@@ -290,10 +308,5 @@ def _caveats(inputs: DiagnosticInputs) -> str:
         "as well as queueing before it.",
         "- Percentiles use linear interpolation between order statistics.",
     ]
-    if inputs.lifecycle_kept != "all":
-        caveats.insert(
-            0,
-            f"- Only `{inputs.lifecycle_kept}` lifecycle transitions are in this log. Which "
-            "transitions to keep changes cycle times, waits, rework and conformance.",
-        )
+    caveats.insert(0, f"- {lifecycle_caveat(inputs.lifecycle)}")
     return "## Caveats\n\n" + "\n".join(caveats)

@@ -7,12 +7,13 @@ parsed events = normalized + excluded (malformed, by reason) + filtered (lifecyc
 
 from __future__ import annotations
 
-from collections.abc import Collection, Mapping
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 
 import pandas as pd
 
 from meridian.ingestion import schema
+from meridian.ingestion.lifecycle import LifecyclePolicy
 
 # Malformed-row reasons, in the order they are checked. An event that fails several checks is
 # counted once, under the first reason it fails, so the per-reason counts sum to the total.
@@ -30,6 +31,7 @@ EXCLUSION_REASONS = (
 # Events with no lifecycle transition are treated as `complete`: in a log without lifecycle data,
 # each event records a finished activity, which is what process-mining tools assume.
 DEFAULT_LIFECYCLE = "complete"
+START = "start"
 
 NO_TERMINAL_STATE = "no_terminal_state"
 
@@ -40,15 +42,19 @@ class NormalizationReport:
 
     Why `filtered_by_lifecycle` is separate from `excluded`: excluded events are malformed data;
     filtered events are well-formed transitions deliberately left out of the normalized view
-    (e.g. `start` when only `complete` is kept). Conflating them would overstate data-quality
-    problems by hundreds of thousands of rows on BPI 2017.
+    (e.g. a work item's `complete` when its `start` represents it). Conflating them would
+    overstate data-quality problems by hundreds of thousands of rows on BPI 2017.
+
+    `activities_represented_by_start` lists the activities the `start_else_complete` policy chose to
+    represent by their start events, so a reader can see exactly which timestamps mean what.
     """
 
     parsed_events: int
     normalized_events: int
     excluded: dict[str, int]
     filtered_by_lifecycle: int
-    lifecycle_kept: list[str] | None
+    lifecycle_policy: str
+    activities_represented_by_start: list[str]
     lifecycle_counts: dict[str, int]
     parsed_cases: int
     normalized_cases: int
@@ -90,18 +96,43 @@ def _counts(series: pd.Series) -> dict[str, int]:
     return {str(key): int(count) for key, count in series.value_counts().items()}
 
 
+def _lifecycle_selection(
+    frame: pd.DataFrame, lifecycle: LifecyclePolicy
+) -> tuple[pd.Series, list[str]]:
+    """Mark which rows the lifecycle policy keeps, and list activities represented by `start`.
+
+    Why `START_ELSE_COMPLETE` decides per activity from the data rather than by name prefix: an
+    activity is a work item with a duration exactly when the log records starts for it. Keying on
+    the `W_` prefix would hard-code one dataset's naming convention into ingestion. On BPI 2017 the
+    data-driven rule selects exactly the eight `W_` activities.
+    """
+    transition = frame[schema.LIFECYCLE]
+    if lifecycle is LifecyclePolicy.ALL:
+        return pd.Series(True, index=frame.index), []
+    if lifecycle is LifecyclePolicy.COMPLETE:
+        return transition.eq(DEFAULT_LIFECYCLE).fillna(False), []
+    with_start = frame.loc[transition.eq(START).fillna(False), schema.ACTIVITY].dropna()
+    started = set(with_start.astype(str))
+    represented_by_start = frame[schema.ACTIVITY].isin(started)
+    keep = (represented_by_start & transition.eq(START)) | (
+        ~represented_by_start & transition.eq(DEFAULT_LIFECYCLE)
+    )
+    return keep.fillna(False).astype(bool), sorted(started)
+
+
 def normalize_events(
     raw: pd.DataFrame,
     *,
-    lifecycle_keep: Collection[str] | None = (DEFAULT_LIFECYCLE,),
+    lifecycle: LifecyclePolicy = LifecyclePolicy.START_ELSE_COMPLETE,
     outcome_activities: Mapping[str, str] | None = None,
 ) -> tuple[pd.DataFrame, NormalizationReport]:
     """Validate, filter and reshape raw events into the normalized event log.
 
     Args:
         raw: Events shaped like `schema.RAW_COLUMNS`, as produced by `parse_xes`.
-        lifecycle_keep: Lifecycle transitions to keep (case-insensitive), or None to keep all.
-            Defaults to `complete` only, pending the decision in 08-OPEN-QUESTIONS.md.
+        lifecycle: Which lifecycle transition represents each activity occurrence. The default,
+            `START_ELSE_COMPLETE`, uses `start` events for every activity that records any, and
+            `complete` events for all others (Ved's decision, 08-OPEN-QUESTIONS.md).
         outcome_activities: Maps terminal activities to an outcome label. A case's outcome is the
             label of the last such activity in its normalized events, or NULL if it has none.
 
@@ -146,10 +177,7 @@ def normalize_events(
     flag(frame[schema.TIMESTAMP].isna(), "missing_timestamp")
     flag(timestamps.isna() & frame[schema.TIMESTAMP].notna(), "unparseable_timestamp")
 
-    if lifecycle_keep is None:
-        lifecycle_ok = pd.Series(True, index=frame.index)
-    else:
-        lifecycle_ok = frame[schema.LIFECYCLE].isin({name.lower() for name in lifecycle_keep})
+    lifecycle_ok, started_activities = _lifecycle_selection(frame, lifecycle)
     well_formed = reasons.isna()
     filtered = well_formed & ~lifecycle_ok
     candidates = well_formed & lifecycle_ok
@@ -188,9 +216,8 @@ def normalize_events(
         normalized_events=len(event_log),
         excluded={reason: int(reasons.eq(reason).sum()) for reason in EXCLUSION_REASONS},
         filtered_by_lifecycle=int(filtered.sum()),
-        lifecycle_kept=None
-        if lifecycle_keep is None
-        else sorted(n.lower() for n in lifecycle_keep),
+        lifecycle_policy=lifecycle.value,
+        activities_represented_by_start=started_activities,
         lifecycle_counts=_counts(frame[schema.LIFECYCLE]),
         parsed_cases=int(frame[schema.CASE_ID].nunique()),
         normalized_cases=int(event_log[schema.CASE_ID].nunique()),

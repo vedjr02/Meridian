@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from meridian.config import PROJECT_ROOT, get_settings
+from meridian.ingestion.lifecycle import LifecyclePolicy
 
 
 def test_default_data_dir_is_repo_relative(monkeypatch) -> None:
@@ -39,16 +40,17 @@ def test_database_urls_default_to_separate_local_databases(monkeypatch) -> None:
     assert settings.test_database_url.endswith("/meridian_test")
 
 
-def test_lifecycle_transitions_are_configurable_from_env(monkeypatch) -> None:
-    """The open lifecycle decision must be switchable by environment, not by editing code."""
-    monkeypatch.setenv("MERIDIAN_LIFECYCLE_TRANSITIONS", "Complete, start")
-    assert get_settings().lifecycle_transitions == ("complete", "start")
+def test_lifecycle_policy_defaults_to_the_decision_and_is_configurable(monkeypatch) -> None:
+    """Default is Ved's decision (start where recorded); comparisons are an env change, not code."""
+    monkeypatch.delenv("MERIDIAN_LIFECYCLE_POLICY", raising=False)
+    assert get_settings().lifecycle_policy is LifecyclePolicy.START_ELSE_COMPLETE
 
-    monkeypatch.setenv("MERIDIAN_LIFECYCLE_TRANSITIONS", "all")
-    assert get_settings().lifecycle_transitions is None
+    monkeypatch.setenv("MERIDIAN_LIFECYCLE_POLICY", " Complete ")
+    assert get_settings().lifecycle_policy is LifecyclePolicy.COMPLETE
 
-    monkeypatch.delenv("MERIDIAN_LIFECYCLE_TRANSITIONS")
-    assert get_settings().lifecycle_transitions == ("complete",)
+    monkeypatch.setenv("MERIDIAN_LIFECYCLE_POLICY", "sometimes")
+    with pytest.raises(ValueError, match="start_else_complete, complete, all"):
+        get_settings()
 
 
 def test_dependency_threshold_defaults_and_env_override(monkeypatch) -> None:

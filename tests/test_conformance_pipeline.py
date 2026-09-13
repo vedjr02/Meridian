@@ -55,7 +55,8 @@ def test_outputs_record_what_the_numbers_were_measured_against(settings) -> None
     assert summary["reference"]["outcome"] == "rejected"
     assert summary["reference"]["activities"] == ["Submit", "Reject"]
     assert "outcome 'rejected'" in summary["reference"]["description"]
-    assert summary["lifecycle_kept"] == "complete"
+    assert summary["lifecycle_policy"] == "start_else_complete"
+    assert summary["reference_path_outcomes"] == {"rejected": 1}
     assert summary["fitness_formula"].startswith("0.5 * (1 - missing / consumed)")
     assert settings.conformance_cases_csv.read_text().count("\n") == 4  # header + 3 cases
 
@@ -69,19 +70,20 @@ def test_diagnosis_writes_every_module_b_output(settings) -> None:
     report = settings.diagnostic_report_md.read_text()
     assert report.startswith("# Process diagnosis — Synthetic loan log")
     assert "33.3% (1 of 3 cases) do not follow the reference path exactly" in report
+    assert "The 2 cases following the reference path end: approved 100%." in report
     assert "No case repeats an activity, so rework adds no cycle time." in report
     assert report == result.report
 
 
-def test_command_requires_an_explicit_reference(settings, monkeypatch, capsys) -> None:
-    """Omitting --reference is a usage error: the choice is never made silently."""
+def test_command_defaults_to_the_most_frequent_variant(settings, monkeypatch, capsys) -> None:
+    """Ved's decision (08-OPEN-QUESTIONS.md): with no flag, the reference is the modal path."""
     monkeypatch.setattr(pipeline, "get_settings", lambda: settings)
 
-    with pytest.raises(SystemExit) as exit_info:
-        pipeline.main([])
+    assert pipeline.main([]) == 0
 
-    assert exit_info.value.code == 2
-    assert "--reference" in capsys.readouterr().err
+    assert "Reference (most_frequent_variant)" in capsys.readouterr().out
+    summary = json.loads(settings.conformance_summary_json.read_text())
+    assert summary["reference"]["strategy"] == "most_frequent_variant"
 
 
 def test_command_runs_and_reports_selection_errors(settings, monkeypatch, capsys) -> None:

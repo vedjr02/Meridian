@@ -20,8 +20,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from meridian.config import Settings, get_settings
 from meridian.discovery.cycle_time import CYCLE_TIME, IS_HAPPY_PATH, summarize_distribution
 from meridian.discovery.layout import layered_layout
-from meridian.discovery.pipeline import COVERAGE_SHARE, lifecycle_description
-from meridian.discovery.summary import NO_OUTCOME
+from meridian.discovery.pipeline import COVERAGE_SHARE, recorded_lifecycle_policy
+from meridian.discovery.summary import NO_OUTCOME, lifecycle_caveat, lifecycle_label
 from meridian.discovery.variants import (
     CASE_COUNT,
     CASE_SHARE,
@@ -103,11 +103,16 @@ def overview(settings: SettingsDep) -> dict[str, Any]:
     model = _json(settings.heuristic_net_json)
     variants = _csv(settings.variants_csv)
     stats = _csv(settings.case_statistics_csv)
+    policy = recorded_lifecycle_policy(settings)
     happy = stats[stats[IS_HAPPY_PATH]]
     others = stats[~stats[IS_HAPPY_PATH]]
     return {
         "dataset": settings.dataset.name,
-        "lifecycle_kept": lifecycle_description(settings),
+        "lifecycle": {
+            "policy": policy.value if policy else None,
+            "description": lifecycle_label(policy),
+            "caveat": lifecycle_caveat(policy),
+        },
         "case_count": len(stats),
         "event_count": int(sum(model["activities"].values())),
         "activity_count": len(model["activities"]),

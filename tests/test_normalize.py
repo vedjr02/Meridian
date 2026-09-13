@@ -3,6 +3,7 @@
 import pandas as pd
 
 from meridian.ingestion import schema
+from meridian.ingestion.lifecycle import LifecyclePolicy
 from meridian.ingestion.normalize import EXCLUSION_REASONS, normalize_events
 
 
@@ -46,7 +47,7 @@ def test_output_columns_are_exactly_the_shared_schema() -> None:
 
 def test_complete_only_projection_is_counted_as_filtered_not_excluded() -> None:
     """Dropping `start` transitions is a deliberate view, not bad data; the report must say so."""
-    event_log, report = normalize_events(raw(CLEAN))
+    event_log, report = normalize_events(raw(CLEAN), lifecycle=LifecyclePolicy.COMPLETE)
 
     assert report.normalized_events == len(event_log) == 5
     assert report.filtered_by_lifecycle == 1
@@ -56,12 +57,50 @@ def test_complete_only_projection_is_counted_as_filtered_not_excluded() -> None:
 
 
 def test_keeping_all_lifecycles_filters_nothing() -> None:
-    """`lifecycle_keep=None` is the switch if the open lifecycle question is answered "keep all"."""
-    event_log, report = normalize_events(raw(CLEAN), lifecycle_keep=None)
+    """The ALL policy keeps every transition (the logged future-work option)."""
+    event_log, report = normalize_events(raw(CLEAN), lifecycle=LifecyclePolicy.ALL)
 
     assert len(event_log) == 6
     assert report.filtered_by_lifecycle == 0
-    assert report.lifecycle_kept is None
+    assert report.lifecycle_policy == "all"
+
+
+def test_start_else_complete_represents_started_activities_by_their_start() -> None:
+    """Default policy: Review records a start, so its start is kept and its complete filtered.
+
+    Submit, Approve and Reject never record a start, so their complete events are kept. Result:
+    5 events (Review at 10:00, when work began, not 11:00), 1 filtered, and the report names Review.
+    """
+    event_log, report = normalize_events(raw(CLEAN))
+
+    review = event_log[event_log[schema.ACTIVITY] == "Review"]
+    assert review[schema.EVENT_INDEX].tolist() == [1]
+    assert review[schema.TIMESTAMP].tolist() == [pd.Timestamp("2016-01-01T10:00:00Z")]
+    assert report.normalized_events == 5
+    assert report.filtered_by_lifecycle == 1
+    assert report.lifecycle_policy == "start_else_complete"
+    assert report.activities_represented_by_start == ["Review"]
+    assert report.is_fully_accounted
+
+
+def test_started_work_item_without_a_complete_is_still_counted() -> None:
+    """The reason for the policy: aborted work items (start, then ate_abort) must not vanish.
+
+    Under complete-only the aborted Call below disappears entirely; under the default it is kept.
+    """
+    rows = [
+        ("c1", 0, "Call", "schedule", "2016-01-01T08:00:00Z", "u"),
+        ("c1", 1, "Call", "start", "2016-01-01T09:00:00Z", "u"),
+        ("c1", 2, "Call", "ate_abort", "2016-01-01T09:30:00Z", "u"),
+        ("c2", 0, "Call", "start", "2016-01-02T09:00:00Z", "u"),
+        ("c2", 1, "Call", "complete", "2016-01-02T09:20:00Z", "u"),
+    ]
+
+    started, _ = normalize_events(raw(rows))
+    completed, _ = normalize_events(raw(rows), lifecycle=LifecyclePolicy.COMPLETE)
+
+    assert len(started) == 2
+    assert len(completed) == 1
 
 
 def test_malformed_events_are_excluded_once_each_with_a_reason() -> None:

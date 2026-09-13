@@ -46,12 +46,7 @@ def synthetic_settings(write_xes, tmp_path) -> Settings:
         sha256=hashlib.sha256(source_file.read_bytes()).hexdigest(),
         outcome_activities=(("Approve", "approved"),),
     )
-    return dataclasses.replace(
-        get_settings(),
-        data_dir=tmp_path / "data",
-        dataset=dataset,
-        lifecycle_transitions=("complete",),
-    )
+    return dataclasses.replace(get_settings(), data_dir=tmp_path / "data", dataset=dataset)
 
 
 def test_pipeline_writes_reconciled_outputs_without_database(synthetic_settings) -> None:

@@ -20,6 +20,7 @@ from meridian.conformance.pipeline import run_conformance
 from meridian.conformance.reference import ReferenceStrategy
 from meridian.conformance.report import DiagnosticInputs, render_diagnostic_report
 from meridian.conformance.rework import analyze_rework
+from meridian.ingestion.lifecycle import LifecyclePolicy
 
 LOG = hours_log(CASES)
 
@@ -35,7 +36,7 @@ def inputs(discovery_settings) -> DiagnosticInputs:
     )
     return DiagnosticInputs(
         dataset_name="Synthetic",
-        lifecycle_kept="complete",
+        lifecycle=LifecyclePolicy.START_ELSE_COMPLETE,
         conformance=conformance.summary,
         bottlenecks=analyze_bottlenecks(LOG, min_occurrences=1, slow_threshold_seconds=2 * HOUR),
         rework=analyze_rework(LOG),
@@ -91,7 +92,7 @@ def test_evidence_sections_and_caveats(inputs) -> None:
     assert "| no terminal state |" in text
     assert "**Uniformly slow** (4 transitions)" in text
     assert "| `B` | 3 | 3 |" in text  # B repeated in 3 cases, 3 repetitions
-    assert "Only `complete` lifecycle transitions are in this log." in text
+    assert "Lifecycle rule: start where recorded, otherwise complete." in text
     assert "not a guaranteed saving" in text
 
 
@@ -107,7 +108,7 @@ def test_log_without_rework_gets_a_plain_answer(discovery_settings) -> None:
     text = render_diagnostic_report(
         DiagnosticInputs(
             dataset_name="Synthetic",
-            lifecycle_kept="all",
+            lifecycle=LifecyclePolicy.ALL,
             conformance=conformance.summary,
             bottlenecks=analyze_bottlenecks(log, min_occurrences=1),
             rework=analyze_rework(log),
@@ -115,7 +116,7 @@ def test_log_without_rework_gets_a_plain_answer(discovery_settings) -> None:
     )
 
     assert "No case repeats an activity, so rework adds no cycle time." in text
-    assert "lifecycle transitions are in this log" not in text
+    assert "Lifecycle rule: every transition." in text
 
 
 def test_report_is_deterministic(inputs) -> None:
