@@ -86,11 +86,26 @@ documented intended process, so Module B's documented-model alternative is not a
 written, and the generated summary states the rank-1 variant's outcome mix so nobody reads it as a
 success path. It blocks Module B (Day 8): conformance measured against a cancellation path would
 make "% of cases deviating from the intended path" mean the opposite of what it says.
+**Evidence added 2026-09-13 (Day 10 code, `complete`-only log, both computed, neither chosen)**:
+
+| Reference model | Cases fitting exactly | Deviating | Log fitness | Mean case fitness: pending / cancelled / denied |
+|---|---|---|---|---|
+| A. Most frequent variant (as written) | 2,209 | 93.0% | 0.576 | 0.477 / 0.868 / 0.506 |
+| B. Most frequent variant among `pending` cases | 969 | 96.9% | 0.677 | 0.755 / 0.610 / 0.595 |
+
+- Under A, successful (`pending`) cases score as the *least* conforming and cancellations as the
+  most, so "deviation from the intended path" would effectively mean "not cancelled".
+- Under B the ordering is coherent: successful cases fit best.
+- Under either, exact-fit deviation is above 90%: no single path covers more than 7% of cases. The
+  report should therefore lead with log fitness and the fitness distribution, not only "% deviating".
+
 **Claude's best guess if forced to proceed anyway**: Keep requirement 4's literal definition for
 Module A's "happy path" statistics (clearly labelled "most common variant"), and for Module B use
-the most frequent variant among `pending` cases as the reference model, logging that choice.
-This also depends on the lifecycle question above, which changes the variants themselves.
-**Status**: open — needed before Day 8
+the most frequent variant among `pending` cases as the reference model (B above), logging that
+choice. This also depends on the lifecycle question above, which changes the variants themselves.
+Until answered, `select_reference_model` has no default and the conformance command will require
+the strategy to be named explicitly.
+**Status**: open — the Day 8–9 code is done without a default; the real-data conformance outputs (Day 10+) need this answer
 
 ## 2026-09-13 — Module A (infra) — Which BPI dataset, and repo setup
 
