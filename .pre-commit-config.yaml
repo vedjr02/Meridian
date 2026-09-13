@@ -21,9 +21,11 @@ repos:
         language: system
         files: ^frontend/
         pass_filenames: false
+      # Everything except `integration` tests, which re-ingest the real 1.2M-event log (~16 s).
+      # Those run at every audit checkpoint instead (06-AUDIT-PROTOCOL.md step 1: full suite).
       - id: pytest
-        name: pytest (full suite)
-        entry: .venv/bin/pytest -q
+        name: pytest (all but integration)
+        entry: .venv/bin/pytest -q -m "not integration"
         language: system
         pass_filenames: false
         always_run: true
