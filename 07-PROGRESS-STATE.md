@@ -7,7 +7,7 @@
 
 ## Current phase
 
-`Week 1, Day 2 — done. Next: Week 1, Day 3 — Directly-Follows Graph.`
+`Week 1, Day 3 — done. Next: Week 1, Day 4 — Heuristic Miner core (footprint matrix, dependency measure).`
 
 Active branch: `module-a-discovery` (pushed, HEAD at end of session 2). `origin/main` already
 contains Day 1 via PR #1, merged by Ved on GitHub; local `main` has not been fast-forwarded (not
@@ -35,6 +35,15 @@ needed for branch work — never commit to `main` directly).
 - [x] Real run loaded into `meridian`: ingestion run id 1
 - [x] Day 2 checkpoint logged in `AUDIT-LOG.md` (60 tests, all green)
 
+## Day 3 checklist (session 2)
+
+- [x] Typed CSV reader for the normalized log — `backend/meridian/ingestion/io.py` (`read_event_log_csv`)
+- [x] DFG computation — `backend/meridian/discovery/dfg.py` (`build_dfg` → `DirectlyFollowsGraph`: edges with frequency, case_frequency, mean and median duration; start/end activities; activity counts; `frequency(a, b)` lookup for the miner)
+- [x] Hand-computed synthetic-log tests — `tests/test_dfg.py`
+- [x] Command `python -m meridian.discovery.dfg [--top N]` → `data/processed/dfg_edges.csv`
+- [x] Real-log invariants (integration) — `tests/test_dfg_cli.py`
+- [x] Day 3 checkpoint logged in `AUDIT-LOG.md` (74 tests, all green)
+
 ## Real-data facts established (BPI 2017, measured session 2)
 
 - 31,509 cases, 1,202,267 events, 26 activities, 149 resources. Every event has case id, activity,
@@ -43,13 +52,14 @@ needed for branch work — never commit to `main` directly).
 - `complete`-only normalized log (current default): 475,306 events, 31,509 cases, 24 activities, 144 resources.
 - Outcomes: pending 17,228 · cancelled 10,431 · denied 3,752 · no terminal state 98. No case reaches two different terminal states.
 - Full ingestion takes ~16 s (parse ~11 s).
+- DFG (`complete`-only log): 443,797 transitions, 159 distinct edges, built in 0.7 s. All 31,509 cases start with `A_Create Application`. Top edge `O_Create Offer -> O_Created` (42,995). Early bottleneck signal for Module B: `A_Complete -> A_Validating` median 7.2 d, mean 8.9 d.
 - The raw XES is one line with no newlines — never grep or line-read it.
 
 ## Status by module
 
 | Module | Status | Notes |
 |---|---|---|
-| A — Process Discovery | Days 1–2 done (infra + ingestion) | Day 3 next: DFG |
+| A — Process Discovery | Days 1–3 done (infra, ingestion, DFG) | Day 4 next: heuristic miner core |
 | B — Conformance & Diagnosis | Not started | Will need start/end pairing from `raw_events.csv` for processing vs. waiting time |
 | C — Automation Scoring | Not started | |
 | D — Business Case & ROI | Not started | |
@@ -59,20 +69,21 @@ needed for branch work — never commit to `main` directly).
 
 ## Last session summary
 
-**2026-09-13 (session 2)** — Completed Day 2 (ingestion). 16 commits this session (35 total on
-the branch), all authored by Vedjr02 with no AI co-author trailers (see `05-GIT-WORKFLOW.md`).
+**2026-09-13 (session 2)** — Completed Day 2 (ingestion) and Day 3 (DFG). All commits authored
+by Vedjr02 with no AI co-author trailers (see `05-GIT-WORKFLOW.md`).
 
-Exact stopping point: working tree clean on `module-a-discovery`, pushed. Nothing mid-change.
+Exact stopping point: Day 3 checkpoint passed and logged; working tree clean on
+`module-a-discovery`, pushed. Nothing mid-change.
 
-**Start Day 3 here:**
-1. Check `08-OPEN-QUESTIONS.md`: the lifecycle question is still **open** and matters for what
-   the real process map shows (Claude recommends option B). It does not block Day 3.
-2. Day 3 = Directly-Follows Graph. Suggested home: `backend/meridian/discovery/dfg.py`. Read the
-   normalized log via `meridian.ingestion.store.read_event_log` (Postgres) or
-   `settings.event_log_csv`. Always order by `(case_id, event_index)` — never rely on timestamp
-   order alone. Import column names from `meridian.ingestion.schema`.
-3. Build a small hand-crafted synthetic log with known transition counts and durations and unit-test
-   against it before touching the real data (04-BUILD-PLAN.md Day 3).
+**Start Day 4 here:**
+1. Check `08-OPEN-QUESTIONS.md`: the lifecycle question is still **open** (Claude recommends
+   option B). It does not block Day 4.
+2. Day 4 = Heuristic Miner core, hand-implemented (02-TECH-STACK-AND-SKILLS.md §1). Suggested
+   home: `backend/meridian/discovery/heuristic_miner.py`. Take |A>B| from
+   `DirectlyFollowsGraph.frequency(a, b)` — do not recount transitions.
+3. Dependency measure `(|A>B| - |B>A|) / (|A>B| + |B>A| + 1)`; classify pairs as causal /
+   parallel / unrelated; threshold configurable. Unit-test specific classifications on the Day 3
+   synthetic log (`tests/test_dfg.py::LOG`) plus any purpose-built logs.
 
 ## Scope decisions
 
@@ -85,6 +96,7 @@ Exact stopping point: working tree clean on `module-a-discovery`, pushed. Nothin
 - 2026-09-13 — Optional `outcome` column filled from each case's last terminal application state (A_Pending/A_Denied/A_Cancelled → pending/denied/cancelled; NULL for 98 open cases). `cost` stays NULL: BPI 2017 has no per-event cost.
 - 2026-09-13 — Added `psycopg[binary]` (the driver for the PostgreSQL already in the tech stack) and an `ingestion_run` audit table (tech stack: Postgres stores "past decision/audit runs").
 - 2026-09-13 — Pre-commit runs every test except `integration` (real-data, ~16 s); integration tests run at each checkpoint.
+- 2026-09-13 — DFG edges report `case_frequency` and median duration beside the required frequency and mean. Reason: median guards against skew (03-UIUX rule 1) and case frequency exposes rework; both are one aggregation each. Full distributions stay in Module B.
 
 ## Known issues / technical debt
 
