@@ -117,6 +117,11 @@ class Settings:
         return self.processed_dir / "dfg_edges.csv"
 
     @property
+    def heuristic_net_json(self) -> Path:
+        """The mined heuristic process model: start/end activities, causal and loop edges."""
+        return self.processed_dir / "heuristic_net.json"
+
+    @property
     def ingestion_report_json(self) -> Path:
         """Accounting of the last ingestion run: counts kept, excluded and filtered, by reason."""
         return self.processed_dir / "ingestion_report.json"
