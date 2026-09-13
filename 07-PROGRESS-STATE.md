@@ -7,11 +7,12 @@
 
 ## Current phase
 
-`Week 1, Day 6 — done; Module A acceptance criteria (a)–(d) met by `python -m meridian.discovery`. Next: Week 1, Day 7 — frontend for Module A, then the pre-Week-2 checkpoint and merge.`
+`Week 1 (Module A) — complete: command-line acceptance (a)–(d) met, frontend view built, pre-merge checkpoint passed. Next: Week 2, Day 8 — Module B reference model (blocked on an open question, see below).`
 
-Active branch: `module-a-discovery` (pushed, HEAD at end of session 2). `origin/main` already
-contains Day 1 via PR #1, merged by Ved on GitHub; local `main` has not been fast-forwarded (not
-needed for branch work — never commit to `main` directly).
+Active branch: `module-a-discovery` (pushed, HEAD `40b7a65`). `origin/main` contains Module A up to
+`ce6f020` via Ved's PRs #1 and #2; the 4 frontend commits after that are pushed and **ready for a PR
+into `main`** (`gh` is not authenticated here, so Ved opens it). Never commit to `main` directly.
+Module B work belongs on a new branch, `module-b-conformance` (05-GIT-WORKFLOW.md).
 
 ## Day 1 checklist (session 1)
 
@@ -69,6 +70,16 @@ needed for branch work — never commit to `main` directly).
 - [x] Outputs generated on the real log in `data/processed/` (`dfg.mmd`, `dfg_edges.csv`, `heuristic_net.json`, `variants.csv`, `case_statistics.csv`, `discovery_summary.md`)
 - [x] Day 6 checkpoint logged in `AUDIT-LOG.md` (167 tests, all green)
 
+## Day 7 checklist (sessions 2–3)
+
+- [x] Hand-written layered layout — `backend/meridian/discovery/layout.py` (`layered_layout`, `count_crossings`) — `tests/test_layout.py`
+- [x] Read-only API — `backend/meridian/api/discovery.py`: `GET /api/discovery/overview`, `/process-map`, `/variants?limit=N`, `/cycle-time/histogram`; structured 404 `discovery_outputs_missing` — `tests/test_api_discovery.py`
+- [x] Frontend `/discovery` (home redirects there): `frontend/src/app/discovery/{page,loading}.tsx`, data layer `frontend/src/lib/discovery.ts` (server-side fetch after `connection()`, base URL `MERIDIAN_API_URL`, default `http://127.0.0.1:8000`), components in `frontend/src/components/discovery/` (`DiscoveryView`, `ProcessMap`, `VariantTable`, `CycleTimeHistogram`), shared `StateMessage`
+- [x] Verified in the browser against the real API: map, variant highlighting, histogram, loading/empty/error states (details in `AUDIT-LOG.md`)
+- [x] Fixed: NUL bytes that made `ProcessMap.tsx` a binary file in git; unreadable 6 px map labels; table overflow; incomplete missing-file list
+- [x] Pre-merge checkpoint logged in `AUDIT-LOG.md` (186 tests, all green, build passes)
+- [ ] PR `module-a-discovery` → `main` for the 4 frontend commits (Ved)
+
 ## Real-data facts established (BPI 2017, measured session 2)
 
 - 31,509 cases, 1,202,267 events, 26 activities, 149 resources. Every event has case id, activity,
@@ -87,8 +98,8 @@ needed for branch work — never commit to `main` directly).
 
 | Module | Status | Notes |
 |---|---|---|
-| A — Process Discovery | Days 1–6 done; acceptance (a)–(d) met by `python -m meridian.discovery` | Day 7 next: frontend view, checkpoint, merge |
-| B — Conformance & Diagnosis | Not started | Will need start/end pairing from `raw_events.csv` for processing vs. waiting time |
+| A — Process Discovery | **Complete** (Week 1): command-line acceptance met, frontend `/discovery` built and verified | Awaiting PR for last 4 commits |
+| B — Conformance & Diagnosis | Not started | Reference model blocked on open question (most common variant ends cancelled). Will need start/end pairing from `raw_events.csv` for processing vs. waiting time |
 | C — Automation Scoring | Not started | |
 | D — Business Case & ROI | Not started | |
 | E — Organizational Network | Not started | Resource data is complete. 5 resources (User_145–149) exist only in non-`complete` transitions |
@@ -97,29 +108,27 @@ needed for branch work — never commit to `main` directly).
 
 ## Last session summary
 
-**2026-09-13 (session 2)** — Completed Days 2–6: ingestion, DFG, heuristic miner (core, loops,
-full model), variants, cycle times, written summary and the single Module A command, with a
-checkpoint after each day. All commits authored by Vedjr02 with no AI co-author trailers (see
-`05-GIT-WORKFLOW.md`).
+**2026-09-13 (sessions 2–3)** — Completed all of Week 1 (Module A): ingestion, DFG, heuristic
+miner, variants, cycle times, written summary, single command, discovery API and the frontend view,
+with a checkpoint after each day and a pre-merge checkpoint at the end. All commits authored by
+Vedjr02 with no AI co-author trailers (see `05-GIT-WORKFLOW.md`).
 
-Exact stopping point: Day 6 checkpoint passed and logged; working tree clean on
-`module-a-discovery`, pushed. Nothing mid-change.
+Exact stopping point: pre-merge checkpoint passed and logged; working tree clean on
+`module-a-discovery`, pushed at `40b7a65`. Nothing mid-change.
 
-**Start Day 7 here:**
-1. `08-OPEN-QUESTIONS.md` has **two open questions for Ved**: lifecycle transitions (all real
-   numbers depend on it) and the most common variant being a cancellation path (blocks Module B's
-   reference model, Day 8). Neither blocks the Day 7 frontend code.
-2. Day 7 = frontend for Module A (03-UIUX-RULES.md §3): the mined process graph as the hero
-   element (large, pannable/zoomable, edge thickness = frequency), the variant table **beside**
-   it rather than below, and a cycle-time **distribution** chart (histogram or box plot, never a
-   bare mean). Also the designed loading, empty and error states (§4).
-3. The backend needs read-only FastAPI endpoints serving `heuristic_net.json`, `variants.csv`
-   and `case_statistics.csv` from `settings.processed_dir`; test them like `/health`.
-4. Library check before installing anything: 02-TECH-STACK lists Recharts or Plotly (charts) and
-   react-force-graph or d3-force (graphs). A layered process-map layout library (dagre, elkjs) is
-   **not** listed; either lay out the graph by hand or log a question first (CLAUDE.md §2).
-5. Then the pre-Week-2 checkpoint, and merge `module-a-discovery` into `main` via a PR only after
-   the full suite passes (05-GIT-WORKFLOW.md).
+**Start Week 2 (Day 8) here:**
+1. `08-OPEN-QUESTIONS.md` has **two open questions for Ved**. Lifecycle transitions: all real
+   numbers depend on it. Most common variant ends cancelled: this decides Module B's reference
+   model. Do not pick the reference model yourself.
+2. Unblocked meanwhile: create `module-b-conformance` (from `main` once the Module A PR is merged,
+   otherwise from `module-a-discovery`). Build the simplified Petri-net-like reference structure
+   and the reference-model selection so that both candidate strategies ("most frequent variant",
+   "most frequent variant among a given outcome") exist and are tested on synthetic logs, with the
+   default left to Ved's answer. Day 9's token-replay core is also testable on synthetic logs.
+3. Module B requirements 1–2 (01-REQUIREMENTS.md) and 02-TECH-STACK §2: justify the fitness
+   formula in a code comment; log which reference model was used.
+4. To run the frontend: `.venv/bin/uvicorn meridian.api.main:app` and
+   `npm --prefix frontend run dev`, then open http://localhost:3000.
 
 ## Scope decisions
 
@@ -132,6 +141,9 @@ Exact stopping point: Day 6 checkpoint passed and logged; working tree clean on
 - 2026-09-13 — Optional `outcome` column filled from each case's last terminal application state (A_Pending/A_Denied/A_Cancelled → pending/denied/cancelled; NULL for 98 open cases). `cost` stays NULL: BPI 2017 has no per-event cost.
 - 2026-09-13 — Added `psycopg[binary]` (the driver for the PostgreSQL already in the tech stack) and an `ingestion_run` audit table (tech stack: Postgres stores "past decision/audit runs").
 - 2026-09-13 — Pre-commit runs every test except `integration` (real-data, ~16 s); integration tests run at each checkpoint.
+- 2026-09-13 — Process-map layout is hand-written (breadth-first stages plus barycenter crossing reduction) and computed in the backend. Reason: 02-TECH-STACK lists only force-directed graph libraries, which scatter a left-to-right process map; layered layout libraries (dagre, elkjs) are not in the stack. The map and histogram are hand-drawn SVG, so no chart or graph package was installed even though Recharts and react-force-graph are allowed.
+- 2026-09-13 — Frontend reads a new read-only discovery API (`/api/discovery/*`) that serves precomputed outputs rather than recomputing, so the page and the written summary always show the same numbers.
+- 2026-09-13 — The process map opens at a legible zoom (fills canvas height from the process start) rather than fit-to-width. Reason: measured 6.2 px labels at fit-to-width on a 1512 px viewport; the whole map is one click away.
 - 2026-09-13 — Command-line DFG visualization is Mermaid (`dfg.mmd`, top 40 edges with a coverage caption), embedded in the summary. Reason: renders on GitHub and in editors with no new dependency, and Mermaid is already accepted for Module C. The interactive map remains the Day 7 frontend's job.
 - 2026-09-13 — The single Module A command (`python -m meridian.discovery`) was built on Day 6 rather than left to Day 7, because it is what satisfies the acceptance criterion; it ingests automatically when no normalized log exists.
 - 2026-09-13 — The written summary adds each top variant's outcome mix and the most common variant within each outcome. Reason: the rank-1 "happy path" variant ends cancelled 100% of the time on BPI 2017, and presenting it unqualified would mislead.
@@ -148,8 +160,12 @@ Exact stopping point: Day 6 checkpoint passed and logged; working tree clean on
 - Homebrew is at `/opt/homebrew/bin/brew` and is not on PATH in non-login shells; Postgres binaries are at `/opt/homebrew/opt/postgresql@18/bin`.
 - `pytest` emits two upstream deprecation warnings from Starlette's TestClient (httpx / anyio aliases). Harmless now.
 - Dependencies use lower-bound pins; no lock file yet. Consider one before the README 10-minute setup test (Day 28).
+- No automated frontend tests. The frontend is covered by `tsc`, `eslint`, `next build` and manual browser verification. A browser test runner (e.g. Playwright) would be a new dependency, so decide before adding one.
+- The process map needs zooming on narrow screens: at "Whole map" on a 1512 px viewport, labels are about 6 px. The default view is legible; a layout that wraps long stages would be the real fix if it matters later.
+- Commit-message check: an unpushed commit titled `abc` appeared on 2026-09-13 containing uncommitted work; at Ved's instruction only its message was reworded. If unexplained commits appear again, check before building on them.
+- `ProcessMap.tsx` once contained literal NUL bytes, which git treats as binary. The checkpoint now scans tracked files for NUL bytes; keep doing so.
 
 ## Real pace vs. planned pace
 
-Days 1 and 2 both completed on 2026-09-13, across two sessions. Too early to judge the 3–4
-hours/day assumption.
+Week 1 (Days 1–7) was completed on 2026-09-13 across three sessions: far ahead of the plan's
+calendar (7 days × 3–4 h). The plan's day boundaries still worked as units of work and checkpoints.
