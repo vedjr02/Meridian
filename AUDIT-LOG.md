@@ -4,6 +4,27 @@ Checkpoint entries per `06-AUDIT-PROTOCOL.md`. Newest first.
 
 ---
 
+## 2026-09-13 — Session 3 — End of Week 2 Day 11 checkpoint (branch `module-b-conformance`, HEAD `b923d5f`)
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Full test suite incl. integration | **Pass** — 240 passed in 50.5 s |
+| 2 | Linters/typecheck | **Pass** — `ruff check`, `ruff format --check`, `eslint`, `tsc` clean |
+| 3 | Requirements re-read: Module B req. 3, Day 11 plan | Wait-time **distribution** per transition, not just the mean: **pass** — Q1, p50, Q3, p90, p99, max and mean per transition. High-variance transitions flagged **separately** from uniformly slow ones: **pass** — `uniformly_slow`, `high_variance`, `slow_and_variable`, with every threshold justified in comments (median ≥ p75 of transition medians; quartile dispersion ≥ 0.5; ≥ 30 occurrences to classify). Groundwork for acceptance "which single transition costs the most aggregate time": `most_costly()`. Reconciliation: summed transition time equals Module A's summed cycle time, on synthetic data and on BPI 2017. Caveat stated in the module docstring: with `complete`-only events, "wait" includes the next activity's processing. |
+| 4 | Scope drift | **Pass, documented** — `transition_occurrences` extracted from the DFG, a behaviour-neutral refactor (DFG tests and real-log invariants unchanged); an explicit "insufficient data" kind for rare transitions. Logged in `07-PROGRESS-STATE.md`. |
+| 5 | Hand-implemented list | **Pass** — statistics with numpy percentiles only; no SciPy, process-mining or conformance library. |
+| 6 | Git authorship | **Pass** — all non-merge commits `Vedjr02`, 0 co-author trailers, no NUL bytes. |
+
+**Real-log result (`complete`-only log)**: 159 transitions; slow threshold 1.0 day; 6 uniformly slow,
+17 slow and variable, 38 high variance, 31 not flagged, 67 with too few occurrences. The costliest
+transition is `A_Complete → A_Cancelled`: 219,694 case-days (31.9% of all elapsed time), median 30.7
+days with quartiles 30.5–30.8 days — a near-constant wait consistent with a fixed cancellation window.
+Second is `A_Complete → A_Validating`: 23.7%, median 7.2 days.
+
+**Failed → fixed**: one long assertion line (auto-wrapped).
+
+---
+
 ## 2026-09-13 — Session 3 — End of Week 2 Day 10 checkpoint (branch `module-b-conformance`, HEAD `85ba38d`)
 
 | # | Check | Result |
