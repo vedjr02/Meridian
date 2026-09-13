@@ -6,6 +6,7 @@ Run locally with: `.venv/bin/uvicorn meridian.api.main:app --reload`
 from fastapi import FastAPI
 
 from meridian import __version__
+from meridian.api import discovery
 
 
 def create_app() -> FastAPI:
@@ -30,6 +31,7 @@ def create_app() -> FastAPI:
         """
         return {"status": "ok", "version": __version__}
 
+    app.include_router(discovery.router)
     return app
 
 
