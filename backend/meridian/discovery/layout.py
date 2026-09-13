@@ -13,8 +13,11 @@ from collections import defaultdict, deque
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-LAYER_SPACING = 260.0
-ROW_SPACING = 90.0
+# Spacing in drawing units, sized for compact 164 x 42 activity boxes: tight enough that the
+# BPI 2017 model (7 stages, up to 8 activities per stage) stays legible when fitted to a laptop
+# screen, loose enough that arrows between neighbouring stages remain distinguishable.
+LAYER_SPACING = 210.0
+ROW_SPACING = 64.0
 ORDERING_SWEEPS = 4
 
 

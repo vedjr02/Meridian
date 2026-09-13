@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Sans, Source_Serif_4 } from "next/font/google";
+import Link from "next/link";
 import "./globals.css";
 
 // Serif for headings and report titles gives the "executive document" register; a neutral sans
@@ -22,9 +23,10 @@ export const metadata: Metadata = {
   description: "Process mining, diagnosis and business-case analytics over real event logs.",
 };
 
-// Order matches the analysis flow: each module builds on the outputs of the ones above it.
-const MODULES = [
-  { key: "A", label: "Process Discovery" },
+// Order matches the analysis flow: each module builds on the outputs of the ones above it. Only
+// built modules get a link, so the navigation never leads to an empty page.
+const MODULES: { key: string; label: string; href?: string }[] = [
+  { key: "A", label: "Process Discovery", href: "/discovery" },
   { key: "B", label: "Conformance & Diagnosis" },
   { key: "C", label: "Automation Scoring" },
   { key: "D", label: "Business Case & ROI" },
@@ -52,7 +54,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               {MODULES.map((module) => (
                 <li key={module.key}>
                   <span className="module-key">{module.key}</span>
-                  {module.label}
+                  {module.href ? <Link href={module.href}>{module.label}</Link> : module.label}
                 </li>
               ))}
             </ol>

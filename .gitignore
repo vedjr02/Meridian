@@ -33,3 +33,4 @@ node_modules/
 
 # Local-only tool settings
 .claude/settings.local.json
+.claude/launch.json
