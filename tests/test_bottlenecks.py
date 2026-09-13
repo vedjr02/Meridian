@@ -7,7 +7,9 @@ Q1 at position 9.75, median at 19.5, Q3 at 29.25.
 
 import pandas as pd
 import pytest
+from test_dfg import LOG as DAY3_LOG
 
+from meridian.config import get_settings
 from meridian.conformance.bottlenecks import (
     BOTTLENECK_COLUMNS,
     BottleneckKind,
@@ -15,7 +17,10 @@ from meridian.conformance.bottlenecks import (
     classify_transition,
     quartile_dispersion,
 )
+from meridian.discovery.cycle_time import case_statistics
+from meridian.discovery.variants import analyze_variants
 from meridian.ingestion import schema
+from meridian.ingestion.io import read_event_log_csv
 
 HOUR = 3_600.0
 DAY = 86_400.0
@@ -128,6 +133,34 @@ def test_default_slow_threshold_is_a_quantile_of_eligible_transition_medians() -
     analysis = analyze_bottlenecks(LOG)
 
     assert analysis.slow_threshold_seconds == pytest.approx(297 * HOUR)
+
+
+def test_total_transition_time_equals_total_cycle_time() -> None:
+    """Consecutive waits telescope: within a case they add up to last event minus first event.
+
+    So bottleneck totals must equal Module A's summed cycle times. A mismatch would mean the two
+    modules disagree about what time exists in the log.
+    """
+    variants = analyze_variants(DAY3_LOG)
+    cycle_seconds = case_statistics(DAY3_LOG, variants)["cycle_time_seconds"].sum()
+
+    assert analyze_bottlenecks(DAY3_LOG).total_seconds == pytest.approx(cycle_seconds)
+
+
+@pytest.mark.integration
+@pytest.mark.skipif(
+    not get_settings().event_log_csv.exists(), reason="run `python -m meridian.discovery` first"
+)
+def test_real_log_bottlenecks_reconcile_with_cycle_times() -> None:
+    """On BPI 2017: time shares sum to 1 and total elapsed time equals summed case cycle times."""
+    log = read_event_log_csv(get_settings().event_log_csv)
+    cycle_seconds = case_statistics(log, analyze_variants(log))["cycle_time_seconds"].sum()
+
+    analysis = analyze_bottlenecks(log)
+
+    assert analysis.total_seconds == pytest.approx(cycle_seconds, rel=1e-9)
+    assert analysis.transitions["share_of_total_time"].sum() == pytest.approx(1.0)
+    assert analysis.transitions["occurrences"].sum() == len(log) - log[schema.CASE_ID].nunique()
 
 
 def test_invalid_inputs_are_rejected() -> None:
