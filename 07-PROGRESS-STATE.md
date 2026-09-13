@@ -7,7 +7,7 @@
 
 ## Current phase
 
-`Week 1, Day 5 — done. Next: Week 1, Day 6 — variant analysis, cycle-time statistics, written summary.`
+`Week 1, Day 6 — done; Module A acceptance criteria (a)–(d) met by `python -m meridian.discovery`. Next: Week 1, Day 7 — frontend for Module A, then the pre-Week-2 checkpoint and merge.`
 
 Active branch: `module-a-discovery` (pushed, HEAD at end of session 2). `origin/main` already
 contains Day 1 via PR #1, merged by Ved on GitHub; local `main` has not been fast-forwarded (not
@@ -59,6 +59,16 @@ needed for branch work — never commit to `main` directly).
 - [x] End-to-end real-data plausibility test (raw XES → ingestion → DFG → model) — `tests/test_module_a_pipeline.py`
 - [x] Day 5 checkpoint logged in `AUDIT-LOG.md` (130 tests, all green)
 
+## Day 6 checklist (session 2)
+
+- [x] Variant analysis — `backend/meridian/discovery/variants.py` (`analyze_variants` → `VariantAnalysis.variants`, `.case_variants`, `.variants_to_cover(share)`) — `tests/test_variants.py`
+- [x] Per-case statistics and distributions — `backend/meridian/discovery/cycle_time.py` (`case_statistics`, `summarize_distribution` → count/mean/min/p50/p90/p99/max) — `tests/test_cycle_time.py`
+- [x] Mermaid DFG rendering — `backend/meridian/discovery/visualize.py` (`dfg_to_mermaid`, top 40 edges with coverage caption) — `tests/test_visualize.py`
+- [x] Deterministic written summary — `backend/meridian/discovery/summary.py` (`render_summary`) — `tests/test_summary.py`
+- [x] Single command `python -m meridian.discovery [--reingest] [--no-db]` — `backend/meridian/discovery/pipeline.py` — `tests/test_discovery_pipeline.py` (incl. real-log acceptance test)
+- [x] Outputs generated on the real log in `data/processed/` (`dfg.mmd`, `dfg_edges.csv`, `heuristic_net.json`, `variants.csv`, `case_statistics.csv`, `discovery_summary.md`)
+- [x] Day 6 checkpoint logged in `AUDIT-LOG.md` (167 tests, all green)
+
 ## Real-data facts established (BPI 2017, measured session 2)
 
 - 31,509 cases, 1,202,267 events, 26 activities, 149 resources. Every event has case id, activity,
@@ -67,6 +77,8 @@ needed for branch work — never commit to `main` directly).
 - `complete`-only normalized log (current default): 475,306 events, 31,509 cases, 24 activities, 144 resources.
 - Outcomes: pending 17,228 · cancelled 10,431 · denied 3,752 · no terminal state 98. No case reaches two different terminal states.
 - Full ingestion takes ~16 s (parse ~11 s).
+- Variants (`complete`-only log): 5,623 distinct for 31,509 cases; 610 cover 80% of cases; top variant 7.0% of cases; 4,150 single-case variants. **Top 3 variants (5,704 cases) all end cancelled** (see 08-OPEN-QUESTIONS.md). Most common variant among `pending` cases is rank 4 (969 cases).
+- Cycle time (`complete`-only log): p50 19.1 d, p90 35.0 d, p99 59.1 d, mean 21.8 d, max 169.1 d. Most common variant p50 31.7 d against 17.9 d for all others.
 - Heuristic net (threshold 0.9, `complete`-only log): 98 edges — 83 causal, 5 length-one loops, 10 length-two-loop edges, 0 best connections; no orphans; mined in 0.3 s. `O_Create Offer ⇄ O_Created` is a length-two loop (multiple offers). Largest rework loop: `A_Incomplete ⇄ A_Validating` (12,282 / 4,427 transitions) — a Module B lead.
 - DFG (`complete`-only log): 443,797 transitions, 159 distinct edges, built in 0.7 s. All 31,509 cases start with `A_Create Application`. Top edge `O_Create Offer -> O_Created` (42,995). Early bottleneck signal for Module B: `A_Complete -> A_Validating` median 7.2 d, mean 8.9 d.
 - The raw XES is one line with no newlines — never grep or line-read it.
@@ -75,7 +87,7 @@ needed for branch work — never commit to `main` directly).
 
 | Module | Status | Notes |
 |---|---|---|
-| A — Process Discovery | Days 1–5 done (infra, ingestion, DFG, heuristic miner with loops) | Day 6 next: variants + cycle times |
+| A — Process Discovery | Days 1–6 done; acceptance (a)–(d) met by `python -m meridian.discovery` | Day 7 next: frontend view, checkpoint, merge |
 | B — Conformance & Diagnosis | Not started | Will need start/end pairing from `raw_events.csv` for processing vs. waiting time |
 | C — Automation Scoring | Not started | |
 | D — Business Case & ROI | Not started | |
@@ -85,23 +97,29 @@ needed for branch work — never commit to `main` directly).
 
 ## Last session summary
 
-**2026-09-13 (session 2)** — Completed Days 2–5: ingestion, DFG, heuristic miner core, loops and
-full model, with a checkpoint after each. All commits authored by Vedjr02 with no AI co-author
-trailers (see `05-GIT-WORKFLOW.md`).
+**2026-09-13 (session 2)** — Completed Days 2–6: ingestion, DFG, heuristic miner (core, loops,
+full model), variants, cycle times, written summary and the single Module A command, with a
+checkpoint after each day. All commits authored by Vedjr02 with no AI co-author trailers (see
+`05-GIT-WORKFLOW.md`).
 
-Exact stopping point: Day 5 checkpoint passed and logged; working tree clean on
+Exact stopping point: Day 6 checkpoint passed and logged; working tree clean on
 `module-a-discovery`, pushed. Nothing mid-change.
 
-**Start Day 6 here:**
-1. Check `08-OPEN-QUESTIONS.md`: the lifecycle question is still **open** (Claude recommends
-   option B). Variant counts and cycle times on real data depend on it; the code does not.
-2. Module A requirements 4–5 (01-REQUIREMENTS.md): per-case statistics (total cycle time, number of
-   activities, happy-path match against the most common variant) and variant analysis (distinct
-   end-to-end paths, frequency, number of variants covering 80% of cases).
-3. Cycle time must be reported as a distribution — p50/p90/p99 at minimum, never mean alone
-   (acceptance criterion d, 03-UIUX rule 1). Suggested home: `backend/meridian/discovery/variants.py`
-   and `cycle_time.py`, each with a hand-computed synthetic test, then a written-summary generator.
-4. After Day 6, acceptance still needs the DFG visualization and one command producing (a)–(d).
+**Start Day 7 here:**
+1. `08-OPEN-QUESTIONS.md` has **two open questions for Ved**: lifecycle transitions (all real
+   numbers depend on it) and the most common variant being a cancellation path (blocks Module B's
+   reference model, Day 8). Neither blocks the Day 7 frontend code.
+2. Day 7 = frontend for Module A (03-UIUX-RULES.md §3): the mined process graph as the hero
+   element (large, pannable/zoomable, edge thickness = frequency), the variant table **beside**
+   it rather than below, and a cycle-time **distribution** chart (histogram or box plot, never a
+   bare mean). Also the designed loading, empty and error states (§4).
+3. The backend needs read-only FastAPI endpoints serving `heuristic_net.json`, `variants.csv`
+   and `case_statistics.csv` from `settings.processed_dir`; test them like `/health`.
+4. Library check before installing anything: 02-TECH-STACK lists Recharts or Plotly (charts) and
+   react-force-graph or d3-force (graphs). A layered process-map layout library (dagre, elkjs) is
+   **not** listed; either lay out the graph by hand or log a question first (CLAUDE.md §2).
+5. Then the pre-Week-2 checkpoint, and merge `module-a-discovery` into `main` via a PR only after
+   the full suite passes (05-GIT-WORKFLOW.md).
 
 ## Scope decisions
 
@@ -114,6 +132,9 @@ Exact stopping point: Day 5 checkpoint passed and logged; working tree clean on
 - 2026-09-13 — Optional `outcome` column filled from each case's last terminal application state (A_Pending/A_Denied/A_Cancelled → pending/denied/cancelled; NULL for 98 open cases). `cost` stays NULL: BPI 2017 has no per-event cost.
 - 2026-09-13 — Added `psycopg[binary]` (the driver for the PostgreSQL already in the tech stack) and an `ingestion_run` audit table (tech stack: Postgres stores "past decision/audit runs").
 - 2026-09-13 — Pre-commit runs every test except `integration` (real-data, ~16 s); integration tests run at each checkpoint.
+- 2026-09-13 — Command-line DFG visualization is Mermaid (`dfg.mmd`, top 40 edges with a coverage caption), embedded in the summary. Reason: renders on GitHub and in editors with no new dependency, and Mermaid is already accepted for Module C. The interactive map remains the Day 7 frontend's job.
+- 2026-09-13 — The single Module A command (`python -m meridian.discovery`) was built on Day 6 rather than left to Day 7, because it is what satisfies the acceptance criterion; it ingests automatically when no normalized log exists.
+- 2026-09-13 — The written summary adds each top variant's outcome mix and the most common variant within each outcome. Reason: the rank-1 "happy path" variant ends cancelled 100% of the time on BPI 2017, and presenting it unqualified would mislead.
 - 2026-09-13 — Mined model includes the HeuristicsMiner "all activities connected" heuristic (edge kind `best_connection`, on by default, `--no-connect-all` to disable). Reason: a global threshold can leave a rare activity disconnected, and Day 5's plausibility check requires no orphan nodes; the separate kind keeps these edges distinguishable from threshold-backed ones. On BPI 2017 at 0.9 it adds 0 edges.
 - 2026-09-13 — One threshold governs the causal, length-one-loop and length-two-loop measures (the literature allows separate ones). Reason: one setting explains the model's strictness; revisit if real-data tuning shows loops need a different bar.
 - 2026-09-13 — Footprint relations add `INFREQUENT` (`~`) beside the spec's causal / parallel / unrelated. Reason: with a dependency threshold, a pair seen in one direction only but below the threshold fits none of the three (not causal, not parallel, not "never follow"); forcing it into one would either admit noise or misstate the log.
