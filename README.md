@@ -4,8 +4,8 @@ Process-mining analytics over a real event log (BPI Challenge 2017). Meridian re
 process actually runs, diagnoses where it breaks down, simulates fixes, and produces an
 executive business case with ROI shown as ranges.
 
-> Status: early build — ingestion and process discovery (Module A) done on the command line;
-> frontend and later modules in progress. See `07-PROGRESS-STATE.md`.
+> Status: Module A (process discovery) is complete, on the command line and in the web app.
+> Modules B–F are next. See `07-PROGRESS-STATE.md`.
 
 ## Quickstart (current state)
 
@@ -39,10 +39,11 @@ brew install postgresql@18 && brew services start postgresql@18
 .venv/bin/pytest -m "not integration"
 .venv/bin/pytest
 
-# API: http://127.0.0.1:8000/health
+# API: http://127.0.0.1:8000/health and /docs (serves the outputs written by meridian.discovery)
 .venv/bin/uvicorn meridian.api.main:app --reload
 
-# Frontend: http://localhost:3000
+# Frontend: http://localhost:3000 opens the process discovery view. It calls the API from the
+# server side; set MERIDIAN_API_URL if the API is not at http://127.0.0.1:8000
 cd frontend && npm install && npm run dev
 ```
 
