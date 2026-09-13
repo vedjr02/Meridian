@@ -4,6 +4,21 @@ Checkpoint entries per `06-AUDIT-PROTOCOL.md`. Newest first.
 
 ---
 
+## 2026-09-13 — Session 3 — End of Week 2 Day 8 checkpoint (branch `module-b-conformance`, HEAD `904f16e`)
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Full test suite incl. integration | **Pass** — 200 passed in 48.0 s |
+| 2 | Linters/typecheck | **Pass** — `ruff check`, `ruff format --check`, `eslint`, `tsc` clean |
+| 3 | Requirements re-read: Module B req. 1, 02-TECH-STACK §2 (structure part), Day 8 plan | "Define a reference model — most frequent variant, or a documented process if provided — log which you used": **pass for the code** — `select_reference_model` implements both, plus the outcome-filtered alternative from the open question; every `ReferenceModel` carries a `description` recording how it was chosen. **Which strategy the real run uses is not decided**: blocked on `08-OPEN-QUESTIONS.md`, so the function has deliberately no default. "Petri-net-like structure": **pass** — the formal places-and-transitions version (`conformance/petri_net.py`), validated on construction. |
+| 4 | Scope drift | **Pass, documented** — formal Petri net instead of the allowed simplified graph; the outcome-filtered reference strategy exists only as an option pending Ved's answer. Logged in `07-PROGRESS-STATE.md`. |
+| 5 | Hand-implemented list | **Pass** — Petri net written by hand; no pm4py, SNAKES or other Petri-net or process-mining package installed or imported. |
+| 6 | Git authorship | **Pass** — 97 commits: all project commits `Vedjr02`, plus Ved's own GitHub merge commits for PRs #1–#3 (shown as "Vedant Ambre"); 0 co-author trailers. No NUL bytes in tracked files. |
+
+**Failed → fixed**: E501 line-length failures in three docstrings or strings; reworded or split.
+
+---
+
 ## 2026-09-13 — Session 2 — End of Week 1 Day 7 checkpoint, pre-merge (branch `module-a-discovery`, HEAD `40b7a65`)
 
 This is the Day 7 checkpoint, the pre-Week-2 checkpoint and the "before merging a module branch
