@@ -17,6 +17,7 @@ import pandas as pd
 
 from meridian.config import DEFAULT_DEPENDENCY_THRESHOLD, validate_dependency_threshold
 from meridian.discovery.dfg import FREQUENCY, SOURCE, TARGET, DirectlyFollowsGraph
+from meridian.ingestion import schema
 
 DEPENDENCY = "dependency"
 CAUSAL_EDGE_COLUMNS = (SOURCE, TARGET, DEPENDENCY, FREQUENCY)
@@ -152,3 +153,55 @@ def causal_edges(
             rows.append((source, target, dependency, int(frequency)))
     edges = pd.DataFrame(rows, columns=list(CAUSAL_EDGE_COLUMNS))
     return edges.sort_values([SOURCE, TARGET], kind="stable").reset_index(drop=True)
+
+
+def length_one_loop_measure(a_to_a: int) -> float:
+    """Return the self-loop measure |A>A| / (|A>A| + 1).
+
+    Why a separate formula: the pairwise dependency of an activity with itself is always 0
+    (|A>A| - |A>A|), so it can never detect an activity immediately repeated. This measure grows
+    toward 1 with the number of immediate repetitions, with the same +1 discount on thin evidence.
+    """
+    if a_to_a < 0:
+        raise ValueError(f"Directly-follows counts cannot be negative: {a_to_a}")
+    return a_to_a / (a_to_a + 1)
+
+
+def length_two_loop_measure(a_b_a: int, b_a_b: int) -> float:
+    """Return the length-two loop measure (|A>>B| + |B>>A|) / (|A>>B| + |B>>A| + 1).
+
+    |A>>B| counts A, B, A as three consecutive events in one case. Why it is needed: a loop
+    A -> B -> A produces both A>B and B>A, which drags the pairwise dependency toward 0 and makes
+    the loop look like parallelism. Activities that are genuinely parallel and executed once each
+    never produce the return pattern A, B, A, so counting the pattern tells the two apart.
+    """
+    if a_b_a < 0 or b_a_b < 0:
+        raise ValueError(f"Pattern counts cannot be negative: {a_b_a}, {b_a_b}")
+    return (a_b_a + b_a_b) / (a_b_a + b_a_b + 1)
+
+
+def count_length_two_patterns(event_log: pd.DataFrame) -> dict[tuple[str, str], int]:
+    """Count |A>>B| for every pair: how often A, B, A occur as consecutive events in one case.
+
+    Why from the event log and not the DFG: the DFG keeps only pairs, and the return pattern needs
+    three consecutive events. Events are ordered by (case_id, event_index), as everywhere else.
+    Patterns never span two cases, and A, A, A is not counted: an immediate repetition is a
+    length-one loop and is measured separately.
+    """
+    log = (
+        event_log.loc[:, [schema.CASE_ID, schema.EVENT_INDEX, schema.ACTIVITY]]
+        .sort_values([schema.CASE_ID, schema.EVENT_INDEX], kind="stable")
+        .reset_index(drop=True)
+    )
+    activity = log[schema.ACTIVITY]
+    middle = activity.shift(-1)
+    # Rows are grouped by case, so events i and i+2 sharing a case means i+1 shares it too.
+    same_case = log[schema.CASE_ID].eq(log[schema.CASE_ID].shift(-2))
+    returns = (
+        same_case.to_numpy(dtype=bool, na_value=False)
+        & activity.eq(activity.shift(-2)).to_numpy(dtype=bool, na_value=False)
+        & activity.ne(middle).to_numpy(dtype=bool, na_value=False)
+    )
+    pairs = pd.DataFrame({"a": activity[returns].to_numpy(), "b": middle[returns].to_numpy()})
+    counts = pairs.groupby(["a", "b"]).size()
+    return {(str(a), str(b)): int(count) for (a, b), count in counts.items()}
