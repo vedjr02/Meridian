@@ -36,8 +36,8 @@ brew install postgresql@18 && brew services start postgresql@18
 .venv/bin/python -m meridian.discovery.heuristic_miner    # mined model -> heuristic_net.json
 
 # Diagnosis (Module B): conformance against a reference model, bottlenecks, rework, written report.
-# The reference strategy must be named; there is deliberately no default.
-.venv/bin/python -m meridian.conformance --reference most_frequent_variant
+# The reference defaults to the most frequent variant (01-REQUIREMENTS); other strategies are opt-in.
+.venv/bin/python -m meridian.conformance
 .venv/bin/python -m meridian.conformance --reference most_frequent_variant_for_outcome --outcome pending
 
 # Tests: fast suite (what the pre-commit hook runs), then everything incl. real-data tests
@@ -61,7 +61,7 @@ All settings live in `backend/meridian/config.py` and can be overridden by envir
 | `MERIDIAN_DATA_DIR` | `./data` | Raw and processed data location |
 | `MERIDIAN_DATABASE_URL` | `postgresql://localhost:5432/meridian` | Database for real runs |
 | `MERIDIAN_TEST_DATABASE_URL` | `postgresql://localhost:5432/meridian_test` | Database tests may wipe |
-| `MERIDIAN_LIFECYCLE_TRANSITIONS` | `complete` | Transitions kept in the normalized log (`all` keeps every one) |
+| `MERIDIAN_LIFECYCLE_POLICY` | `start_else_complete` | Which lifecycle event represents each activity: `start_else_complete` (start where the activity records starts, otherwise complete), `complete`, or `all` |
 | `MERIDIAN_DEPENDENCY_THRESHOLD` | `0.9` | Evidence an edge needs to enter the mined model, strictly between 0 and 1 |
 
 ## Layout

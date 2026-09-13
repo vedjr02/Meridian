@@ -71,8 +71,9 @@ def select_reference_model(
         documented_activities: Required for `DOCUMENTED`: the intended sequence from process
             documentation.
 
-    Why an explicit strategy argument with no default: the choice changes every conformance number
-    and is an open question, so callers must state it rather than inherit one silently.
+    Why an explicit strategy argument with no default: the choice changes every conformance number,
+    so library callers must state it rather than inherit one silently. The project's decision
+    (most frequent variant, 08-OPEN-QUESTIONS.md) is the command's default, not this function's.
     """
     if strategy is ReferenceStrategy.DOCUMENTED:
         if not documented_activities:
