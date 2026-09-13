@@ -6,12 +6,16 @@ edge frequencies are exactly the |A>B| counts that the dependency measure is com
 
 from __future__ import annotations
 
+import argparse
+import sys
 from dataclasses import dataclass
 from functools import cached_property
 
 import pandas as pd
 
+from meridian.config import get_settings
 from meridian.ingestion import schema
+from meridian.ingestion.io import read_event_log_csv
 
 SOURCE = "source"
 TARGET = "target"
@@ -167,3 +171,70 @@ def _aggregate_edges(transitions: pd.DataFrame) -> pd.DataFrame:
     return edges.sort_values(
         [FREQUENCY, SOURCE, TARGET], ascending=[False, True, True], kind="stable"
     ).reset_index(drop=True)[list(EDGE_COLUMNS)]
+
+
+def _format_duration(seconds: float) -> str:
+    """Render seconds at a readable scale (s, min, h, d) for terminal output."""
+    if seconds < 60:
+        return f"{seconds:.0f}s"
+    if seconds < 3600:
+        return f"{seconds / 60:.1f}min"
+    if seconds < 86400:
+        return f"{seconds / 3600:.1f}h"
+    return f"{seconds / 86400:.1f}d"
+
+
+def format_summary(dfg: DirectlyFollowsGraph, top: int = 10) -> str:
+    """Render the DFG's headline numbers and most frequent transitions as plain text.
+
+    Why the median is printed before the mean: the median is the typical duration, and showing
+    the mean beside it lets a reader see how far the long tail pulls the average.
+    """
+    lines = [
+        f"Cases: {dfg.case_count:,}   Activities: {len(dfg.activity_counts):,}   "
+        f"Transitions: {dfg.transition_count:,}   Distinct edges: {len(dfg.edges):,}",
+        f"Start activities: {dfg.start_activities}",
+        f"End activities: {dfg.end_activities}",
+        f"Top {min(top, len(dfg.edges))} transitions by frequency:",
+    ]
+    for edge in dfg.edges.head(top).itertuples(index=False):
+        lines.append(
+            f"  {edge.source} -> {edge.target}: {edge.frequency:,} "
+            f"({edge.case_frequency:,} cases), "
+            f"median {_format_duration(edge.median_duration_seconds)}, "
+            f"mean {_format_duration(edge.mean_duration_seconds)}"
+        )
+    return "\n".join(lines)
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Command-line entry point: `python -m meridian.discovery.dfg [--top N]`.
+
+    Reads the normalized log written by ingestion, writes `dfg_edges.csv`, and prints a summary.
+    Why the CSV rather than PostgreSQL: the module must run in isolation, and every ingestion run
+    writes the CSV whether or not a database is available.
+    """
+    parser = argparse.ArgumentParser(description="Build the directly-follows graph (Module A).")
+    parser.add_argument(
+        "--top", type=int, default=10, help="how many of the most frequent transitions to print"
+    )
+    args = parser.parse_args(argv)
+
+    settings = get_settings()
+    if not settings.event_log_csv.exists():
+        print(
+            f"No normalized event log at {settings.event_log_csv}; "
+            "run `python -m meridian.ingestion` first.",
+            file=sys.stderr,
+        )
+        return 1
+
+    dfg = build_dfg(read_event_log_csv(settings.event_log_csv))
+    dfg.edges.to_csv(settings.dfg_edges_csv, index=False)
+    print(format_summary(dfg, top=args.top))
+    print(f"Edges written to {settings.dfg_edges_csv}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
