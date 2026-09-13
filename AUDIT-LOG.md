@@ -4,6 +4,21 @@ Checkpoint entries per `06-AUDIT-PROTOCOL.md`. Newest first.
 
 ---
 
+## 2026-09-13 — Session 2 — End of Week 1 Day 3 checkpoint (branch `module-a-discovery`, HEAD `143b54a`)
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Full test suite incl. integration | **Pass** — 74 passed in 16.1 s (both real-data integration tests ran; no skips) |
+| 2 | Linters/formatters (`ruff check`, `ruff format --check`, `eslint`) | **Pass** — all clean |
+| 3 | Requirements re-read: Module A req. 2 (DFG), Day 3 plan | "For every case, compute activity-to-activity transitions; aggregate frequency and average duration per transition": **pass** — `build_dfg` in `backend/meridian/discovery/dfg.py`. "Unit tests against a hand-crafted synthetic log where you know the correct answer": **pass** — `tests/test_dfg.py`, every expected value hand-computed and annotated. Real log: 443,797 transitions = 475,306 events − 31,509 cases (identity holds); 159 distinct edges; runs in 0.7 s. Module A acceptance (a) "DFG visualization" not yet built — scheduled with the single-command output (Days 5–7). |
+| 4 | Scope drift | **Pass, documented** — `case_frequency` and median duration added beside the required frequency and mean; typed CSV reader; `python -m meridian.discovery.dfg` command. Logged in `07-PROGRESS-STATE.md`. |
+| 5 | Hand-implemented algorithms list | **Pass** — DFG built with pandas grouping only; no pm4py, networkx or SimPy installed or imported. |
+| 6 | Git authorship | **Pass** — 42 commits, all `Vedjr02`, 0 co-author trailers. |
+
+**Failed → fixed during this unit of work**: two E501 line-length failures (docstring, f-string); reworded.
+
+---
+
 ## 2026-09-13 — Session 2 — End of Week 1 Day 2 checkpoint (branch `module-a-discovery`, HEAD `31330e8`)
 
 | # | Check | Result |
