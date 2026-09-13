@@ -7,7 +7,7 @@
 
 ## Current phase
 
-`Week 2, Day 11 — done (bottleneck analysis). Next: Week 2, Day 12 — rework loop detection and its cycle-time cost. Published conformance run still waits for Ved's reference-model decision.`
+`Week 2, Day 12 — done (rework detection and cost). Next: Week 2, Day 13 — written diagnostic report generator. The report's conformance section needs Ved's reference-model decision; bottleneck and rework sections do not.`
 
 Active branch: `module-b-conformance`, created from `main` after Ved merged PR #3 (all of Module A
 is in `main`). Pushed. Never commit to `main` directly.
@@ -106,6 +106,11 @@ is in `main`). Pushed. Never commit to `main` directly.
 - [x] Day 11 checkpoint logged in `AUDIT-LOG.md` (240 tests, all green)
 - [ ] Not yet: a bottleneck command/output file (planned with the Day 13 report generator)
 
+## Day 12 checklist (session 3)
+
+- [x] `analyze_rework(event_log)` → `ReworkAnalysis` (per case: rework events, repeated activities, rework seconds, cycle time, share; per activity: cases, repeats, total/median span; totals `total_rework_seconds`, `rework_time_share`, `rework_case_share`; `rework_time_distribution()`) — `backend/meridian/conformance/rework.py` — `tests/test_rework.py`
+- [x] Day 12 checkpoint logged in `AUDIT-LOG.md` (248 tests, all green)
+
 ## Real-data facts established (BPI 2017, measured session 2)
 
 - 31,509 cases, 1,202,267 events, 26 activities, 149 resources. Every event has case id, activity,
@@ -116,6 +121,7 @@ is in `main`). Pushed. Never commit to `main` directly.
 - Full ingestion takes ~16 s (parse ~11 s).
 - Variants (`complete`-only log): 5,623 distinct for 31,509 cases; 610 cover 80% of cases; top variant 7.0% of cases; 4,150 single-case variants. **Top 3 variants (5,704 cases) all end cancelled** (see 08-OPEN-QUESTIONS.md). Most common variant among `pending` cases is rank 4 (969 cases).
 - Cycle time (`complete`-only log): p50 19.1 d, p90 35.0 d, p99 59.1 d, mean 21.8 d, max 169.1 d. Most common variant p50 31.7 d against 17.9 d for all others.
+- Rework (`complete`-only log): 16,234 of 31,509 cases (51.5%) repeat an activity; 149,309 case-days = 21.7% of all cycle time sit inside rework loops; per affected case p50 5.8 d, p90 24.6 d. Top: `A_Validating` (11,669 cases), offer creation (8,559 cases; possibly renegotiation, not errors).
 - Bottlenecks (`complete`-only log): costliest transition `A_Complete → A_Cancelled`, 31.9% of all elapsed case-time, median 30.7 d with quartiles 30.5–30.8 d (looks like a fixed cancellation window, i.e. policy rather than capacity); next `A_Complete → A_Validating`, 23.7%, median 7.2 d. Slow threshold 1.0 d. Kinds: 6 uniformly slow, 17 slow and variable, 38 high variance, 31 not flagged, 67 insufficient data.
 - Heuristic net (threshold 0.9, `complete`-only log): 98 edges — 83 causal, 5 length-one loops, 10 length-two-loop edges, 0 best connections; no orphans; mined in 0.3 s. `O_Create Offer ⇄ O_Created` is a length-two loop (multiple offers). Largest rework loop: `A_Incomplete ⇄ A_Validating` (12,282 / 4,427 transitions) — a Module B lead.
 - DFG (`complete`-only log): 443,797 transitions, 159 distinct edges, built in 0.7 s. All 31,509 cases start with `A_Create Application`. Top edge `O_Create Offer -> O_Created` (42,995). Early bottleneck signal for Module B: `A_Complete -> A_Validating` median 7.2 d, mean 8.9 d.
@@ -126,7 +132,7 @@ is in `main`). Pushed. Never commit to `main` directly.
 | Module | Status | Notes |
 |---|---|---|
 | A — Process Discovery | **Complete** (Week 1): command-line acceptance met, frontend `/discovery` built and verified | Awaiting PR for last 4 commits |
-| B — Conformance & Diagnosis | Days 8–11 done (Petri net, reference selection, replay, conformance command, bottlenecks) | Day 12 next: rework loops. Published conformance run waits for the reference decision. Real-data reference choice blocked on open question. Will need start/end pairing from `raw_events.csv` for processing vs. waiting time |
+| B — Conformance & Diagnosis | Days 8–12 done (Petri net, reference selection, replay, conformance command, bottlenecks, rework) | Day 13 next: diagnostic report. Published conformance run waits for the reference decision. Real-data reference choice blocked on open question. Will need start/end pairing from `raw_events.csv` for processing vs. waiting time |
 | C — Automation Scoring | Not started | |
 | D — Business Case & ROI | Not started | |
 | E — Organizational Network | Not started | Resource data is complete. 5 resources (User_145–149) exist only in non-`complete` transitions |
@@ -168,6 +174,7 @@ Exact stopping point: pre-merge checkpoint passed and logged; working tree clean
 - 2026-09-13 — Optional `outcome` column filled from each case's last terminal application state (A_Pending/A_Denied/A_Cancelled → pending/denied/cancelled; NULL for 98 open cases). `cost` stays NULL: BPI 2017 has no per-event cost.
 - 2026-09-13 — Added `psycopg[binary]` (the driver for the PostgreSQL already in the tech stack) and an `ingestion_run` audit table (tech stack: Postgres stores "past decision/audit runs").
 - 2026-09-13 — Pre-commit runs every test except `integration` (real-data, ~16 s); integration tests run at each checkpoint.
+- 2026-09-13 — Rework time is attributed as the union of each repeated activity's first-to-last span per case. Reason: requirement 4 asks for time "attributable to rework" without defining attribution; this rule is transparent, never double-counts overlapping loops, and is labelled as attribution rather than a counterfactual saving. A per-activity table is added so the Day 13 report can name the loops.
 - 2026-09-13 — Bottleneck classification adds `slow_and_variable` (both flags) and `insufficient_data` (under 30 occurrences) beside the required "uniformly slow" and "high variance". Reason: a transition can genuinely be both, and classifying tiny samples would report noise as findings.
 - 2026-09-13 — The conformance summary adds mean case fitness per outcome. Reason: it is the evidence that shows whether a reference model is a sensible "intended path" (on BPI 2017 it exposed that the literal most-frequent variant rewards cancellations).
 - 2026-09-13 — Token-replay fitness is the standard two-term formula 0.5(1 − m/c) + 0.5(1 − r/p) (Rozinat and van der Aalst 2008), not the single ratio 02-TECH-STACK suggests (the spec asks for a justified choice). Reason: missing and remaining deviations are scored separately so neither dilutes the other, and results match the standard definition. Activities absent from the reference count as one missing plus one remaining token.
