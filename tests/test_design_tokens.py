@@ -62,6 +62,26 @@ def test_contrast_formula_matches_reference_values() -> None:
     assert contrast_ratio("#777777", "#ffffff") == pytest.approx(4.48, abs=0.01)
 
 
+AA_NON_TEXT = 3.0
+
+# Graphical marks a reader must perceive to understand a chart or map (WCAG 1.4.11).
+NON_TEXT_PAIRS = [
+    ("--color-edge", "--color-canvas"),
+    ("--color-edge", "--color-surface"),
+    ("--color-accent", "--color-surface-sunken"),
+]
+
+
+@pytest.mark.parametrize(("foreground", "background"), NON_TEXT_PAIRS)
+def test_graphic_marks_meet_non_text_contrast(foreground: str, background: str) -> None:
+    """Edges, bars and axes must reach 3:1 against their background (WCAG AA, non-text)."""
+    tokens = _load_tokens()
+
+    ratio = contrast_ratio(tokens[foreground], tokens[background])
+
+    assert ratio >= AA_NON_TEXT, f"{foreground} on {background} is only {ratio:.2f}:1"
+
+
 @pytest.mark.parametrize(("foreground", "background"), TEXT_PAIRS)
 def test_text_pairs_meet_wcag_aa(foreground: str, background: str) -> None:
     """Every text/background pairing must reach 4.5:1 (WCAG AA for normal-size text)."""

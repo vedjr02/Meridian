@@ -1,0 +1,531 @@
+/* Module A screen. Dense by design: this is an analytical tool (03-UIUX-RULES.md §2). */
+
+.page {
+  display: grid;
+  gap: var(--space-4);
+  max-width: 1600px;
+}
+
+/* Header: title and scope on the left, headline numbers on the right. */
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4) var(--space-8);
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.heading {
+  min-width: 280px;
+}
+
+.eyebrow {
+  margin: 0 0 var(--space-1);
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.title {
+  font-size: 28px;
+  line-height: 1.15;
+}
+
+.scope {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-muted);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(170px, auto));
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.stat {
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.stat dt {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.stat dd {
+  margin: var(--space-1) 0 0;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.stat dd span {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.stat .range {
+  font-size: 18px;
+}
+
+/* The tinted ground and the "Caveat" tag carry the signal; no side accent bar. */
+.caveat {
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-risk-medium-soft);
+  border-radius: var(--radius);
+  color: var(--color-text);
+}
+
+.caveatTag {
+  margin-right: var(--space-2);
+  color: var(--color-risk-medium);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* The map is the hero; the variant table sits beside it, not below. */
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 2.3fr) minmax(340px, 1fr);
+  gap: var(--space-4);
+  align-items: stretch;
+}
+
+@media (max-width: 1180px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+}
+
+.panel {
+  min-width: 0;
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.panelHeader {
+  margin-bottom: var(--space-3);
+}
+
+.panelHeader h2 {
+  font-size: 18px;
+}
+
+.panelHeader p {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+/* Process map */
+.mapFrame {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.mapToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mapButtons {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.mapButtons button,
+.textButton {
+  padding: var(--space-1) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.mapButtons button:hover,
+.textButton:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.mapNote {
+  margin: 0;
+  padding: var(--space-1) var(--space-3);
+  background: var(--color-surface-sunken);
+  color: var(--color-text);
+  font-size: 13px;
+}
+
+.mapCanvas {
+  display: block;
+  width: 100%;
+  height: 620px;
+  background: var(--color-canvas);
+  border: 1px solid var(--color-border);
+  cursor: grab;
+  touch-action: none;
+}
+
+.mapCanvas:active {
+  cursor: grabbing;
+}
+
+.edge {
+  fill: none;
+  stroke: var(--color-edge);
+}
+
+.edge:hover {
+  stroke: var(--color-accent);
+}
+
+.edgeLoop {
+  stroke-dasharray: 8 5;
+}
+
+.edgeConnection {
+  stroke-dasharray: 2 5;
+}
+
+.edgeOn {
+  stroke: var(--color-accent);
+}
+
+.edgeDimmed {
+  opacity: 0.18;
+}
+
+.arrow {
+  fill: var(--color-edge);
+}
+
+.arrowHighlight {
+  fill: var(--color-accent);
+}
+
+.node rect {
+  fill: var(--color-surface);
+  stroke: var(--color-border-strong);
+  stroke-width: 1;
+}
+
+.nodeStart rect {
+  stroke: var(--color-text);
+  stroke-width: 1.5;
+}
+
+.nodeOn rect {
+  fill: var(--color-accent-soft);
+  stroke: var(--color-accent);
+  stroke-width: 2;
+}
+
+.nodeDimmed {
+  opacity: 0.35;
+}
+
+.nodeLabel {
+  fill: var(--color-text);
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.nodeCount {
+  fill: var(--color-text-muted);
+  font-family: var(--font-ui);
+  font-size: 10px;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: 0;
+  padding: 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  list-style: none;
+}
+
+.legend li {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.legendLine {
+  display: inline-block;
+  width: 26px;
+  height: 0;
+  border-top: 2px solid var(--color-edge);
+}
+
+.legendLoop {
+  border-top-style: dashed;
+}
+
+.legendConnection {
+  border-top-style: dotted;
+}
+
+.legendCausal {
+  border-top-style: solid;
+}
+
+.legendMarker {
+  border-top: 2px dashed var(--color-text);
+}
+
+/* Variant table */
+.variantFrame {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.tableScroll {
+  max-height: 520px;
+  overflow: auto;
+  border: 1px solid var(--color-border);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.caption {
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  text-align: left;
+  caption-side: top;
+}
+
+.table th,
+.table td {
+  padding: 6px var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--color-surface-sunken);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.table tbody th {
+  font-weight: 500;
+}
+
+.numeric {
+  text-align: right !important;
+  white-space: nowrap;
+}
+
+.subtle {
+  color: var(--color-text-muted);
+}
+
+.cellNote {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.mapHint {
+  align-self: center;
+  margin-left: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.rowSelected td {
+  background: var(--color-accent-soft);
+}
+
+.rankButton {
+  padding: 0 var(--space-1);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  color: var(--color-accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rankButton:hover,
+.rankButton[aria-pressed="true"] {
+  border-color: var(--color-accent);
+}
+
+.cumulative {
+  position: relative;
+  display: inline-block;
+  width: 56px;
+}
+
+.cumulativeBar {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 0;
+  background: var(--color-accent-soft);
+}
+
+.cumulativeText {
+  position: relative;
+}
+
+.outcomes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.outcomes li {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  white-space: nowrap;
+}
+
+.swatch {
+  display: inline-block;
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 1px;
+}
+
+.toneLow {
+  background: var(--color-risk-low);
+}
+
+.toneMedium {
+  background: var(--color-risk-medium);
+}
+
+.toneHigh {
+  background: var(--color-risk-high);
+}
+
+.toneNeutral {
+  background: var(--color-edge);
+}
+
+.sequence {
+  padding: var(--space-3);
+  background: var(--color-surface-sunken);
+}
+
+.sequenceHeader {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.sequenceHeader h3 {
+  font-size: 15px;
+}
+
+.sequence ol {
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-6);
+  font-size: 13px;
+}
+
+.sequenceHint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+/* Cycle-time histogram */
+.histogram {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: var(--space-2);
+}
+
+.axis {
+  stroke: var(--color-edge);
+}
+
+.axisLabel {
+  fill: var(--color-text-muted);
+  font-family: var(--font-ui);
+  font-size: 11px;
+}
+
+.barOther {
+  fill: var(--color-edge);
+}
+
+.barTop {
+  fill: var(--color-accent);
+}
+
+.barOverflow {
+  stroke: var(--color-edge);
+}
+
+.hatchBackground {
+  fill: var(--color-surface);
+}
+
+.hatchLine {
+  stroke: var(--color-edge);
+  stroke-width: 2;
+}
+
+.barOtherSwatch {
+  background: var(--color-edge);
+}
+
+.barTopSwatch {
+  background: var(--color-accent);
+}
+
+.marker {
+  stroke: var(--color-text);
+  stroke-dasharray: 4 3;
+}
+
+.markerLabel {
+  fill: var(--color-text);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.distributionTable {
+  margin-top: var(--space-3);
+}

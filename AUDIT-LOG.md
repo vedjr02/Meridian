@@ -4,6 +4,42 @@ Checkpoint entries per `06-AUDIT-PROTOCOL.md`. Newest first.
 
 ---
 
+## 2026-09-13 — Session 2 — End of Week 1 Day 7 checkpoint, pre-merge (branch `module-a-discovery`, HEAD `40b7a65`)
+
+This is the Day 7 checkpoint, the pre-Week-2 checkpoint and the "before merging a module branch
+into main" checkpoint from `06-AUDIT-PROTOCOL.md`.
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Full test suite incl. integration | **Pass** — 186 passed in 47.5 s, all four real-data integration tests included |
+| 2 | Linters, typecheck, build | **Pass** — `ruff check`, `ruff format --check`, `tsc --noEmit`, `eslint` clean; `next build` succeeds with `/discovery` rendered on demand (no API call at build time) |
+| 3 | Requirements re-read: all of Module A in `01-REQUIREMENTS.md` plus `03-UIUX-RULES.md` §1–5 for Module A | Module A req. 1–5 and acceptance (a)–(d): **pass**, re-verified by running `python -m meridian.discovery` (31,509 cases, 5,623 variants, 610 cover 80%, p50/p90/p99 19.1/35.0/59.1 d). UI rules, **verified in the browser against the real API**: map is the hero element, pannable (drag, arrow keys) and zoomable (wheel, +/−, buttons), edge width encodes frequency; variant table beside the map, and selecting a variant highlights its path (variant #4: 10 of 11 transitions highlighted, the 11th reported as below threshold); cycle time shown as a histogram with p50/p90/p99 markers plus a percentile table, never a bare mean; loading, empty (API on an empty data directory lists all 4 missing files) and error (API stopped: "fetch failed (ECONNREFUSED)" plus how to start it) states all designed and checked; colour never the only signal (outcome names printed beside swatches, edge legend in text); text and graphic contrast tested (20 token pairs). |
+| 4 | Scope drift | **Pass, documented** — hand-written layered layout in the backend, hand-drawn SVG map and histogram (no chart, graph or layout library installed), read-only discovery API, legible default zoom with a whole-map control. Logged in `07-PROGRESS-STATE.md`. |
+| 5 | Hand-implemented list / LLM rule | **Pass** — no pm4py, networkx, SimPy or LLM SDK in Python; no dagre, elk, d3, Recharts, Plotly or force-graph in the frontend. |
+| 6 | Git authorship and history | **Pass** — 85 commits, all `Vedjr02`, 0 co-author trailers. An unpushed commit named `abc` holding the Day 7 frontend was reworded (message only; tree and parent verified identical) at Ved's instruction before pushing. |
+
+**Failed → fixed during this unit of work**
+- `ProcessMap.tsx` contained three literal NUL bytes (pair-key separators), so git and GitHub treated
+  it as a binary file with no reviewable diff. Replaced with `JSON.stringify([source, target])` keys;
+  a NUL-byte scan of all tracked files is now part of this checkpoint.
+- Measured in the browser: fitting the whole map rendered labels at 6.2 px with 291 px of unused
+  canvas. The map now opens at canvas height (labels 11.8 px), with a Whole map control.
+- Variant table overflowed its panel by 20 px (measured); restructured to 0 px overflow.
+- Empty state listed only 1 of 4 missing files because `Promise.all` stops at the first rejection;
+  switched to `allSettled` with merged results.
+- Grammar in the below-threshold note ("1 of 11 transitions … are").
+
+**Not done / deferred**
+- No automated frontend tests. Covered by typecheck, lint, build and the browser verification above;
+  a browser test runner would be a new dependency and needs a decision first.
+- Claude Code post-edit test hook — still deferred.
+
+**Merge status**: `origin/main` already contains Module A up to `ce6f020` (Ved's PR #2). The 4 frontend
+commits after it are pushed on `module-a-discovery` and ready for a PR into `main`. `gh` is not
+authenticated on this machine, so the PR is Ved's to open.
+
+---
+
 ## 2026-09-13 — Session 2 — End of Week 1 Day 6 checkpoint (branch `module-a-discovery`, HEAD `5ec012e`)
 
 | # | Check | Result |
