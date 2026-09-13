@@ -152,6 +152,26 @@ class Settings:
         return self.processed_dir / "conformance_summary.json"
 
     @property
+    def bottlenecks_csv(self) -> Path:
+        """Per-transition wait-time distribution, aggregate time and bottleneck classification."""
+        return self.processed_dir / "bottlenecks.csv"
+
+    @property
+    def rework_cases_csv(self) -> Path:
+        """Per-case rework events, repeated activities and cycle time inside rework loops."""
+        return self.processed_dir / "rework_cases.csv"
+
+    @property
+    def rework_activities_csv(self) -> Path:
+        """Per-activity rework: affected cases, repetitions and time spans."""
+        return self.processed_dir / "rework_activities.csv"
+
+    @property
+    def diagnostic_report_md(self) -> Path:
+        """Written Module B report answering the three diagnostic questions with numbers."""
+        return self.processed_dir / "diagnostic_report.md"
+
+    @property
     def ingestion_report_json(self) -> Path:
         """Accounting of the last ingestion run: counts kept, excluded and filtered, by reason."""
         return self.processed_dir / "ingestion_report.json"
