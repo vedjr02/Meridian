@@ -7,7 +7,7 @@
 
 ## Current phase
 
-`Week 2, Day 9 — done (token-based replay core). Next: Week 2, Day 10 — replay across the full log, per-case and aggregate fitness (the real run's reference model is still Ved's open question).`
+`Week 2, Day 10 — code done (full-log replay, aggregates, conformance command); the published real-data run waits for Ved's reference-model decision. Next: Week 2, Day 11 — bottleneck analysis (independent of the reference model).`
 
 Active branch: `module-b-conformance`, created from `main` after Ved merged PR #3 (all of Module A
 is in `main`). Pushed. Never commit to `main` directly.
@@ -91,6 +91,14 @@ is in `main`). Pushed. Never commit to `main` directly.
 - [x] Hand-traced tests (perfect, skipped, swapped, repeated, unknown, truncated, very different, empty) plus 500 seeded random traces checking conservation — `tests/test_replay.py`
 - [x] Day 9 checkpoint logged in `AUDIT-LOG.md` (211 tests, all green)
 
+## Day 10 checklist (session 3)
+
+- [x] `replay_log(event_log, net)` → `LogReplay` (per-case rows; `fitting_cases`, `deviating_share`, pooled `log_fitness`, `case_fitness_summary()`); each distinct sequence replayed once — `backend/meridian/conformance/replay.py` — `tests/test_replay_log.py`
+- [x] Command `python -m meridian.conformance --reference {most_frequent_variant|most_frequent_variant_for_outcome|documented} [--outcome X] [--documented-activity A ...]` → `conformance_cases.csv`, `conformance_summary.json` — `backend/meridian/conformance/pipeline.py` — `tests/test_conformance_pipeline.py`
+- [x] Both candidate references replayed on the real log as evidence; results in `08-OPEN-QUESTIONS.md`
+- [ ] **Waiting on Ved**: run the command into `data/processed/` with the chosen reference
+- [x] Day 10 checkpoint logged in `AUDIT-LOG.md` (222 tests, all green)
+
 ## Real-data facts established (BPI 2017, measured session 2)
 
 - 31,509 cases, 1,202,267 events, 26 activities, 149 resources. Every event has case id, activity,
@@ -110,7 +118,7 @@ is in `main`). Pushed. Never commit to `main` directly.
 | Module | Status | Notes |
 |---|---|---|
 | A — Process Discovery | **Complete** (Week 1): command-line acceptance met, frontend `/discovery` built and verified | Awaiting PR for last 4 commits |
-| B — Conformance & Diagnosis | Days 8–9 done (Petri net, reference selection, token replay core) | Day 10 next: full-log replay and aggregates. Real-data reference choice blocked on open question. Will need start/end pairing from `raw_events.csv` for processing vs. waiting time |
+| B — Conformance & Diagnosis | Days 8–10 code done (Petri net, reference selection, replay, conformance command) | Day 11 next: bottlenecks. Published conformance run waits for the reference decision. Real-data reference choice blocked on open question. Will need start/end pairing from `raw_events.csv` for processing vs. waiting time |
 | C — Automation Scoring | Not started | |
 | D — Business Case & ROI | Not started | |
 | E — Organizational Network | Not started | Resource data is complete. 5 resources (User_145–149) exist only in non-`complete` transitions |
@@ -152,6 +160,7 @@ Exact stopping point: pre-merge checkpoint passed and logged; working tree clean
 - 2026-09-13 — Optional `outcome` column filled from each case's last terminal application state (A_Pending/A_Denied/A_Cancelled → pending/denied/cancelled; NULL for 98 open cases). `cost` stays NULL: BPI 2017 has no per-event cost.
 - 2026-09-13 — Added `psycopg[binary]` (the driver for the PostgreSQL already in the tech stack) and an `ingestion_run` audit table (tech stack: Postgres stores "past decision/audit runs").
 - 2026-09-13 — Pre-commit runs every test except `integration` (real-data, ~16 s); integration tests run at each checkpoint.
+- 2026-09-13 — The conformance summary adds mean case fitness per outcome. Reason: it is the evidence that shows whether a reference model is a sensible "intended path" (on BPI 2017 it exposed that the literal most-frequent variant rewards cancellations).
 - 2026-09-13 — Token-replay fitness is the standard two-term formula 0.5(1 − m/c) + 0.5(1 − r/p) (Rozinat and van der Aalst 2008), not the single ratio 02-TECH-STACK suggests (the spec asks for a justified choice). Reason: missing and remaining deviations are scored separately so neither dilutes the other, and results match the standard definition. Activities absent from the reference count as one missing plus one remaining token.
 - 2026-09-13 — Module B uses a formal labelled Petri net (places, transitions, markings) rather than the simplified "graph with required order" that 02-TECH-STACK also allows. Reason: missing/remaining tokens need places to refer to; restriction: no silent transitions.
 - 2026-09-13 — Reference selection offers a third strategy, "most frequent variant for an outcome", beside the two in 01-REQUIREMENTS. Reason: the open question about the cancellation path; it is an option only, and the function has no default until Ved decides.
