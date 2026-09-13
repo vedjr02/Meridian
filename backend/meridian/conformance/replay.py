@@ -17,7 +17,29 @@ from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+import numpy as np
+import pandas as pd
+
 from meridian.conformance.petri_net import PetriNet, Transition
+from meridian.ingestion import schema
+
+PRODUCED = "produced"
+CONSUMED = "consumed"
+MISSING = "missing"
+REMAINING = "remaining"
+UNKNOWN_ACTIVITIES = "unknown_activities"
+FITNESS = "fitness"
+FITS = "fits"
+CASE_REPLAY_COLUMNS = (
+    schema.CASE_ID,
+    PRODUCED,
+    CONSUMED,
+    MISSING,
+    REMAINING,
+    UNKNOWN_ACTIVITIES,
+    FITNESS,
+    FITS,
+)
 
 
 @dataclass(frozen=True)
@@ -123,3 +145,93 @@ def replay_trace(net: PetriNet, trace: Sequence[str]) -> ReplayResult:
         remaining=remaining,
         unknown_activities=unknown,
     )
+
+
+@dataclass(frozen=True)
+class LogReplay:
+    """Replay results for every case in a log, with log-level aggregates.
+
+    Attributes:
+        cases: One row per case, columns `CASE_REPLAY_COLUMNS`, ordered by case id.
+    """
+
+    cases: pd.DataFrame
+
+    @property
+    def case_count(self) -> int:
+        """Number of cases replayed."""
+        return len(self.cases)
+
+    @property
+    def fitting_cases(self) -> int:
+        """Cases that follow the reference exactly (no missing and no remaining tokens)."""
+        return int(self.cases[FITS].sum())
+
+    @property
+    def deviating_share(self) -> float:
+        """Share of cases that deviate from the reference: the "% of cases deviating" headline."""
+        return 1 - self.fitting_cases / self.case_count
+
+    @property
+    def log_fitness(self) -> float:
+        """Log-level fitness from pooled token counts: 0.5(1 - Σm/Σc) + 0.5(1 - Σr/Σp).
+
+        Why pooled counts rather than only the mean of case fitness: pooling is the standard
+        log-level definition and weights each case by how much behaviour it contains, so one very
+        short deviating case does not count as much as a long one. The mean of case fitness is
+        also reported by `case_fitness_summary`, because a reader asking "how well does a typical
+        case fit" wants that instead.
+        """
+        totals = self.cases[[PRODUCED, CONSUMED, MISSING, REMAINING]].sum()
+        return 0.5 * (1 - totals[MISSING] / totals[CONSUMED]) + 0.5 * (
+            1 - totals[REMAINING] / totals[PRODUCED]
+        )
+
+    def case_fitness_summary(self) -> dict[str, float]:
+        """Distribution of case fitness: mean plus p10, p50 and p90 (linear interpolation).
+
+        Why percentiles: fitness across cases is lumpy (many exact 1.0s, a long tail of partial
+        fits), so a mean alone hides whether deviation is widespread or concentrated.
+        """
+        values = self.cases[FITNESS].to_numpy(dtype=float)
+        p10, p50, p90 = np.percentile(values, [10, 50, 90])
+        return {
+            "mean": float(values.mean()),
+            "p10": float(p10),
+            "p50": float(p50),
+            "p90": float(p90),
+        }
+
+
+def replay_log(event_log: pd.DataFrame, net: PetriNet) -> LogReplay:
+    """Replay every case of a normalized event log through `net`.
+
+    Events are ordered by (case_id, event_index), as in Module A. Why each distinct activity
+    sequence is replayed once and the result shared by its cases: replay depends only on the
+    sequence, and BPI 2017's 31,509 cases have 5,623 distinct sequences, so this does a sixth of
+    the work with identical results.
+    """
+    if event_log.empty:
+        raise ValueError("Cannot replay an empty event log")
+    ordered = event_log.loc[:, [schema.CASE_ID, schema.EVENT_INDEX, schema.ACTIVITY]].sort_values(
+        [schema.CASE_ID, schema.EVENT_INDEX], kind="stable"
+    )
+    sequences = ordered.groupby(schema.CASE_ID, sort=True)[schema.ACTIVITY].agg(tuple)
+    results = {sequence: replay_trace(net, sequence) for sequence in sequences.unique()}
+
+    rows = [
+        (
+            case_id,
+            result.produced,
+            result.consumed,
+            result.missing,
+            result.remaining,
+            result.unknown_activities,
+            result.fitness,
+            result.fits,
+        )
+        for case_id, result in (
+            (case_id, results[sequence]) for case_id, sequence in sequences.items()
+        )
+    ]
+    return LogReplay(cases=pd.DataFrame(rows, columns=list(CASE_REPLAY_COLUMNS)))
