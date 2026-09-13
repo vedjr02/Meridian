@@ -4,6 +4,27 @@ Checkpoint entries per `06-AUDIT-PROTOCOL.md`. Newest first.
 
 ---
 
+## 2026-09-13 — Session 3 — End of Week 2 Day 12 checkpoint (branch `module-b-conformance`, HEAD `2b59bd5`)
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Full test suite incl. integration | **Pass** — 248 passed in 51.6 s |
+| 2 | Linters/typecheck | **Pass** — `ruff check`, `ruff format --check`, `eslint`, `tsc` clean |
+| 3 | Requirements re-read: Module B req. 4, Day 12 plan | "Identify cases where the same activity recurs within one case": **pass** — per case, rework events (repetitions beyond the first) and repeated activities; per activity, cases, repeats and spans. "Quantify total added cycle time attributable to rework across the dataset": **pass** — `total_rework_seconds` and `rework_time_share`, using an attribution rule stated in the module docstring (union of first-to-last spans of repeated activities, so overlapping loops count once; explicitly not a counterfactual). Hand-derived tests cover overlap, disjoint spans and triple executions. Cycle times reconcile with Module A on synthetic data and on BPI 2017. |
+| 4 | Scope drift | **Pass, documented** — per-activity rework table and the per-affected-case rework distribution, both supporting the Day 13 report. Logged in `07-PROGRESS-STATE.md`. |
+| 5 | Hand-implemented list | **Pass** — interval union implemented by hand (vectorized sweep); no libraries beyond pandas/numpy. |
+| 6 | Git authorship | **Pass** — all non-merge commits `Vedjr02`, 0 co-author trailers, no NUL bytes. |
+
+**Real-log result (`complete`-only log)**: 16,234 of 31,509 cases (51.5%) repeat at least one
+activity; 149,309 case-days, **21.7% of all cycle time**, sit inside rework loops (per affected case:
+p50 5.8 d, p90 24.6 d, p99 50.6 d). The most looped activities are `A_Validating` (11,669 cases) and
+offer creation (`O_Create Offer`/`O_Created`, 8,559 cases). The report should note that repeated offers
+may be renegotiation rather than error correction.
+
+**Failed → fixed**: one long docstring, and a slow per-case lambda aggregation replaced with min/max.
+
+---
+
 ## 2026-09-13 — Session 3 — End of Week 2 Day 11 checkpoint (branch `module-b-conformance`, HEAD `b923d5f`)
 
 | # | Check | Result |
