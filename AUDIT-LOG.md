@@ -4,6 +4,30 @@ Checkpoint entries per `06-AUDIT-PROTOCOL.md`. Newest first.
 
 ---
 
+## 2026-09-13 — Session 2 — End of Week 1 Day 4 checkpoint (branch `module-a-discovery`, HEAD `ff3bb29`)
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Full test suite incl. integration | **Pass** — 106 passed in 16.8 s, no skips |
+| 2 | Linters/formatters (`ruff check`, `ruff format --check`, `eslint`) | **Pass** — all clean |
+| 3 | Requirements re-read: Module A req. 3, 02-TECH-STACK §1 steps 1–3, Day 4 plan | Step 1 (|A>B|): **pass** — read from the DFG, never recounted. Step 2 (dependency measure): **pass** — `dependency_measure`, verified on hand-computed values and antisymmetry. Step 3 (configurable, justified threshold): **pass** — `DEFAULT_DEPENDENCY_THRESHOLD` in config with count-level justification, `MERIDIAN_DEPENDENCY_THRESHOLD` override, invalid values rejected. Footprint classification (causal / parallel / unrelated): **pass**, each class tested on a pair with a known answer, including the Day 3 synthetic log as the plan requires. Steps 4–5 (loops, full model output) are Day 5 and not yet built. |
+| 4 | Scope drift | **Pass, documented** — `INFREQUENT` footprint class added (one-directional pair below threshold, which the spec's three classes do not cover); logged in `07-PROGRESS-STATE.md`. |
+| 5 | Hand-implemented algorithms list | **Pass** — miner written by hand over DFG counts with plain Python/pandas; no pm4py, networkx or SimPy installed or imported. |
+| 6 | Git authorship | **Pass** — 47 commits, all `Vedjr02`, 0 co-author trailers. |
+
+**Real-log sanity check (not yet a pinned test)**: 24 activities give 552 off-diagonal footprint
+cells (310 `#`, 83 `->`, 83 `<-`, 36 `||`, 40 `~`; the two causal directions match as mirror
+consistency requires). 83 causal edges at 0.9, connecting all 24 activities. Found a concrete
+case of the documented length-two-loop limitation: `O_Create Offer -> O_Created` (42,995 vs
+3,913 reverse, dependency 0.833) is classed parallel, and all 3,913 reverse transitions are
+`Create Offer, Created, Create Offer` sequences from cases with several offers. Day 5's loop
+detection must fix exactly this.
+
+**Failed → fixed during this unit of work**: one E501 in a test docstring and one long signature
+(auto-wrapped by the formatter).
+
+---
+
 ## 2026-09-13 — Session 2 — End of Week 1 Day 3 checkpoint (branch `module-a-discovery`, HEAD `143b54a`)
 
 | # | Check | Result |
