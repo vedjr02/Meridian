@@ -4,6 +4,27 @@ Checkpoint entries per `06-AUDIT-PROTOCOL.md`. Newest first.
 
 ---
 
+## 2026-09-13 — Session 2 — End of Week 1 Day 5 checkpoint (branch `module-a-discovery`, HEAD `0727a75`)
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Full test suite incl. integration | **Pass** — 130 passed in 32.2 s; all three real-data integration tests ran (ingestion→Postgres, DFG invariants, Module A end-to-end) |
+| 2 | Linters/formatters (`ruff check`, `ruff format --check`, `eslint`) | **Pass** — all clean |
+| 3 | Requirements re-read: Module A req. 3, 02-TECH-STACK §1 steps 4–5, Day 5 plan | Step 4, loops detected separately from the footprint: **pass** — `length_one_loop_measure`, `length_two_loop_measure` and `count_length_two_patterns`, with a test showing the footprint alone calls a loop parallel. Step 5, model output of start activities, end activities and causal edges: **pass** — `HeuristicNet` / `heuristic_net.json`. Threshold configuration: **pass** — config/env plus `--threshold`. Day 5 end-to-end real-data check: **pass** — `tests/test_module_a_pipeline.py`: no orphan activities, sole start `A_Create Application` with no incoming edge, ends sum to cases, all edges between known activities. Module A acceptance (single command producing DFG visualization, model, variant table, cycle-time summary) is not yet complete: variants and cycle times are Day 6, visualization and the single command Days 6–7. |
+| 4 | Scope drift | **Pass, documented** — "all activities connected" heuristic (edge kind `best_connection`), and one threshold shared by the causal and both loop measures; both logged in `07-PROGRESS-STATE.md`. |
+| 5 | Hand-implemented algorithms list | **Pass** — loop measures, pattern counting and model assembly hand-written over pandas; no pm4py, networkx or SimPy installed or imported. |
+| 6 | Git authorship | **Pass** — 56 commits, all `Vedjr02`, 0 co-author trailers. |
+
+**Real-log result (threshold 0.9, `complete`-only log)**: 98 edges — 83 causal, 5 length-one
+loops, 10 length-two-loop edges, 0 best connections; mined in 0.3 s. The Day 4 finding is resolved:
+`O_Create Offer ⇄ O_Created` is now a length-two loop, not parallel. Largest rework loop surfaced
+for Module B: `A_Incomplete ⇄ A_Validating` (12,282 and 4,427 transitions).
+
+**Failed → fixed during this unit of work**: two long lines (one docstring reworded, one call
+auto-wrapped by the formatter).
+
+---
+
 ## 2026-09-13 — Session 2 — End of Week 1 Day 4 checkpoint (branch `module-a-discovery`, HEAD `ff3bb29`)
 
 | # | Check | Result |
