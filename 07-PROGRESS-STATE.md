@@ -7,12 +7,10 @@
 
 ## Current phase
 
-`Week 1 (Module A) — complete: command-line acceptance (a)–(d) met, frontend view built, pre-merge checkpoint passed. Next: Week 2, Day 8 — Module B reference model (blocked on an open question, see below).`
+`Week 2, Day 8 — done (Petri net + reference selection; which reference the real run uses is still Ved's open question). Next: Week 2, Day 9 — token-based replay core.`
 
-Active branch: `module-a-discovery` (pushed, HEAD `40b7a65`). `origin/main` contains Module A up to
-`ce6f020` via Ved's PRs #1 and #2; the 4 frontend commits after that are pushed and **ready for a PR
-into `main`** (`gh` is not authenticated here, so Ved opens it). Never commit to `main` directly.
-Module B work belongs on a new branch, `module-b-conformance` (05-GIT-WORKFLOW.md).
+Active branch: `module-b-conformance`, created from `main` after Ved merged PR #3 (all of Module A
+is in `main`). Pushed. Never commit to `main` directly.
 
 ## Day 1 checklist (session 1)
 
@@ -78,7 +76,14 @@ Module B work belongs on a new branch, `module-b-conformance` (05-GIT-WORKFLOW.m
 - [x] Verified in the browser against the real API: map, variant highlighting, histogram, loading/empty/error states (details in `AUDIT-LOG.md`)
 - [x] Fixed: NUL bytes that made `ProcessMap.tsx` a binary file in git; unreadable 6 px map labels; table overflow; incomplete missing-file list
 - [x] Pre-merge checkpoint logged in `AUDIT-LOG.md` (186 tests, all green, build passes)
-- [ ] PR `module-a-discovery` → `main` for the 4 frontend commits (Ved)
+- [x] PR `module-a-discovery` → `main` (Ved merged PR #3)
+
+## Day 8 checklist (session 3)
+
+- [x] `VariantAnalysis.sequence(rank)` — exact activity tuples, not just display text (`backend/meridian/discovery/variants.py`)
+- [x] Labelled Petri net + `sequence_net(activities)` — `backend/meridian/conformance/petri_net.py` — `tests/test_petri_net.py`
+- [x] `select_reference_model(event_log, strategy, outcome=..., documented_activities=...)` → `ReferenceModel` with `description`, `supporting_cases`, `eligible_cases`; strategies `most_frequent_variant`, `most_frequent_variant_for_outcome`, `documented`; **no default strategy** — `backend/meridian/conformance/reference.py` — `tests/test_reference_model.py`
+- [x] Day 8 checkpoint logged in `AUDIT-LOG.md` (200 tests, all green)
 
 ## Real-data facts established (BPI 2017, measured session 2)
 
@@ -99,7 +104,7 @@ Module B work belongs on a new branch, `module-b-conformance` (05-GIT-WORKFLOW.m
 | Module | Status | Notes |
 |---|---|---|
 | A — Process Discovery | **Complete** (Week 1): command-line acceptance met, frontend `/discovery` built and verified | Awaiting PR for last 4 commits |
-| B — Conformance & Diagnosis | Not started | Reference model blocked on open question (most common variant ends cancelled). Will need start/end pairing from `raw_events.csv` for processing vs. waiting time |
+| B — Conformance & Diagnosis | Day 8 done (Petri net, reference selection) | Day 9 next: token replay. Real-data reference choice blocked on open question. Will need start/end pairing from `raw_events.csv` for processing vs. waiting time |
 | C — Automation Scoring | Not started | |
 | D — Business Case & ROI | Not started | |
 | E — Organizational Network | Not started | Resource data is complete. 5 resources (User_145–149) exist only in non-`complete` transitions |
@@ -141,6 +146,8 @@ Exact stopping point: pre-merge checkpoint passed and logged; working tree clean
 - 2026-09-13 — Optional `outcome` column filled from each case's last terminal application state (A_Pending/A_Denied/A_Cancelled → pending/denied/cancelled; NULL for 98 open cases). `cost` stays NULL: BPI 2017 has no per-event cost.
 - 2026-09-13 — Added `psycopg[binary]` (the driver for the PostgreSQL already in the tech stack) and an `ingestion_run` audit table (tech stack: Postgres stores "past decision/audit runs").
 - 2026-09-13 — Pre-commit runs every test except `integration` (real-data, ~16 s); integration tests run at each checkpoint.
+- 2026-09-13 — Module B uses a formal labelled Petri net (places, transitions, markings) rather than the simplified "graph with required order" that 02-TECH-STACK also allows. Reason: missing/remaining tokens need places to refer to; restriction: no silent transitions.
+- 2026-09-13 — Reference selection offers a third strategy, "most frequent variant for an outcome", beside the two in 01-REQUIREMENTS. Reason: the open question about the cancellation path; it is an option only, and the function has no default until Ved decides.
 - 2026-09-13 — Process-map layout is hand-written (breadth-first stages plus barycenter crossing reduction) and computed in the backend. Reason: 02-TECH-STACK lists only force-directed graph libraries, which scatter a left-to-right process map; layered layout libraries (dagre, elkjs) are not in the stack. The map and histogram are hand-drawn SVG, so no chart or graph package was installed even though Recharts and react-force-graph are allowed.
 - 2026-09-13 — Frontend reads a new read-only discovery API (`/api/discovery/*`) that serves precomputed outputs rather than recomputing, so the page and the written summary always show the same numbers.
 - 2026-09-13 — The process map opens at a legible zoom (fills canvas height from the process start) rather than fit-to-width. Reason: measured 6.2 px labels at fit-to-width on a 1512 px viewport; the whole map is one click away.
