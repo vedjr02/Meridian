@@ -1,0 +1,35 @@
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Data: raw and derived event logs are large and distributed under the 4TU.ResearchData
+# General Terms of Use, so they are reproduced with `python -m meridian.datasets`, never committed.
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Node / Next.js
+node_modules/
+.next/
+
+# Local-only tool settings
+.claude/settings.local.json

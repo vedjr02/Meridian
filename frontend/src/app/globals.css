@@ -1,0 +1,189 @@
+/*
+ * Meridian design tokens (03-UIUX-RULES.md section 2).
+ * Structure uses warm neutral grays/off-whites; a single accent is reserved for interactive and
+ * primary elements; status colours are deliberately muted, never saturated traffic-light hues.
+ * Every text/background pairing is contrast-checked by tests/test_design_tokens.py (WCAG AA).
+ */
+:root {
+  --color-canvas: #f6f5f1;
+  --color-surface: #ffffff;
+  --color-surface-sunken: #eeece6;
+  --color-border: #d8d5cc;
+  --color-border-strong: #b9b5aa;
+  --color-text: #1b1b19;
+  --color-text-muted: #56544e;
+  --color-text-inverse: #ffffff;
+
+  --color-accent: #1f4e79;
+  --color-accent-strong: #163a5b;
+  --color-accent-soft: #e4ecf3;
+
+  --color-risk-high: #8f3a2f;
+  --color-risk-high-soft: #f2e1dd;
+  --color-risk-medium: #7a5712;
+  --color-risk-medium-soft: #f3ead6;
+  --color-risk-low: #3b6546;
+  --color-risk-low-soft: #e1ebe3;
+
+  /* Two families only: serif for headings/report titles, sans for data and UI chrome. */
+  --font-display: var(--font-serif), Georgia, "Times New Roman", serif;
+  --font-ui: var(--font-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --radius: 2px;
+  --sidebar-width: 232px;
+  --topbar-height: 48px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-text);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.45;
+  /* Tabular figures keep digits aligned in dense tables and stat columns. */
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* App shell: top bar, module sidebar, content. */
+.shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) 1fr;
+  grid-template-rows: var(--topbar-height) 1fr;
+  grid-template-areas:
+    "topbar topbar"
+    "sidebar content";
+  min-height: 100vh;
+}
+
+.topbar {
+  grid-area: topbar;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-6) 0;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.wordmark {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.wordmark-subtitle {
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.sidebar {
+  grid-area: sidebar;
+  padding: var(--space-4) 0;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+}
+
+.sidebar-heading {
+  margin: 0 0 var(--space-2);
+  padding: 0 var(--space-6);
+  color: var(--color-text-muted);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.module-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.module-list li {
+  display: flex;
+  gap: var(--space-3);
+  align-items: baseline;
+  padding: var(--space-2) var(--space-6);
+  color: var(--color-text-muted);
+}
+
+.module-key {
+  min-width: 1ch;
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.content {
+  grid-area: content;
+  padding: var(--space-8);
+}
+
+/* Empty states are designed, never a blank screen (03-UIUX-RULES.md section 4). */
+.empty-state {
+  max-width: 560px;
+  padding: var(--space-6);
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius);
+}
+
+.empty-state h1 {
+  margin-bottom: var(--space-2);
+  font-size: 22px;
+}
+
+.empty-state p {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+/* Desktop-first tool; below tablet width the shell just stacks so nothing visibly breaks. */
+@media (max-width: 768px) {
+  .shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: var(--topbar-height) auto 1fr;
+    grid-template-areas:
+      "topbar"
+      "sidebar"
+      "content";
+  }
+
+  .sidebar {
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+}

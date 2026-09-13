@@ -1,0 +1,29 @@
+# Rolling check from 06-AUDIT-PROTOCOL.md: lint plus the FULL test suite must pass before any
+# commit completes. Hooks are `local` and call the project's own .venv tools, so the pinned
+# versions run and nothing extra is fetched at commit time.
+# Install once per clone: .venv/bin/pre-commit install
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: .venv/bin/ruff check
+        language: system
+        types: [python]
+      - id: ruff-format
+        name: ruff format --check
+        entry: .venv/bin/ruff format --check
+        language: system
+        types: [python]
+      - id: frontend-lint
+        name: eslint (frontend)
+        entry: npm --prefix frontend run lint
+        language: system
+        files: ^frontend/
+        pass_filenames: false
+      - id: pytest
+        name: pytest (full suite)
+        entry: .venv/bin/pytest -q
+        language: system
+        pass_filenames: false
+        always_run: true
