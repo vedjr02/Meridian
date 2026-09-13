@@ -64,6 +64,15 @@ DEFAULT_TEST_DATABASE_URL = "postgresql://localhost:5432/meridian_test"
 # schema"): the normalized log keeps only `complete` transitions until Ved decides otherwise.
 DEFAULT_LIFECYCLE_TRANSITIONS: tuple[str, ...] = ("complete",)
 
+# Heuristic Miner dependency threshold: a pair A->B becomes a causal edge when
+# (|A>B| - |B>A|) / (|A>B| + |B>A| + 1) reaches this value. 0.9 is the common default
+# (02-TECH-STACK-AND-SKILLS.md). What it means in counts: with no reverse observations a pair
+# needs |A>B| >= 9 to qualify (n / (n + 1) >= 0.9), and each reverse observation raises the bar,
+# e.g. 50 forward against 1 backward gives 49 / 52 = 0.94 and still qualifies. On BPI 2017's
+# 31,509 cases, 9 observations is a permissive floor, so the value is revisited against the real
+# log when the full model is run on Day 5; any change and its reason go in 07-PROGRESS-STATE.md.
+DEFAULT_DEPENDENCY_THRESHOLD = 0.9
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -80,6 +89,7 @@ class Settings:
     database_url: str
     test_database_url: str
     lifecycle_transitions: tuple[str, ...] | None
+    dependency_threshold: float = DEFAULT_DEPENDENCY_THRESHOLD
 
     @property
     def raw_dir(self) -> Path:
@@ -126,6 +136,18 @@ def _parse_lifecycle_transitions(value: str | None) -> tuple[str, ...] | None:
     return names or DEFAULT_LIFECYCLE_TRANSITIONS
 
 
+def validate_dependency_threshold(value: float) -> float:
+    """Return `value` if it is a usable dependency threshold, else raise ValueError.
+
+    Why the open interval (0, 1): the dependency measure is always strictly below 1 (the +1 in its
+    denominator), so a threshold of 1 or more silently yields a model with no edges, and a
+    threshold of 0 or less would accept pairs with no directional evidence at all.
+    """
+    if not 0 < value < 1:
+        raise ValueError(f"Dependency threshold must be strictly between 0 and 1, got {value}")
+    return value
+
+
 def get_settings() -> Settings:
     """Build settings from the environment, falling back to local defaults.
 
@@ -140,5 +162,8 @@ def get_settings() -> Settings:
         test_database_url=os.environ.get("MERIDIAN_TEST_DATABASE_URL", DEFAULT_TEST_DATABASE_URL),
         lifecycle_transitions=_parse_lifecycle_transitions(
             os.environ.get("MERIDIAN_LIFECYCLE_TRANSITIONS")
+        ),
+        dependency_threshold=validate_dependency_threshold(
+            float(os.environ.get("MERIDIAN_DEPENDENCY_THRESHOLD", DEFAULT_DEPENDENCY_THRESHOLD))
         ),
     )

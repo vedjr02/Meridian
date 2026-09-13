@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import pytest
+
 from meridian.config import PROJECT_ROOT, get_settings
 
 
@@ -47,3 +49,21 @@ def test_lifecycle_transitions_are_configurable_from_env(monkeypatch) -> None:
 
     monkeypatch.delenv("MERIDIAN_LIFECYCLE_TRANSITIONS")
     assert get_settings().lifecycle_transitions == ("complete",)
+
+
+def test_dependency_threshold_defaults_and_env_override(monkeypatch) -> None:
+    """The miner's threshold is tunable per run (02-TECH-STACK: configurable, not hardcoded)."""
+    monkeypatch.delenv("MERIDIAN_DEPENDENCY_THRESHOLD", raising=False)
+    assert get_settings().dependency_threshold == 0.9
+
+    monkeypatch.setenv("MERIDIAN_DEPENDENCY_THRESHOLD", "0.75")
+    assert get_settings().dependency_threshold == 0.75
+
+
+@pytest.mark.parametrize("value", ["0", "1", "1.5", "-0.2"])
+def test_unusable_dependency_threshold_is_rejected(monkeypatch, value: str) -> None:
+    """A threshold of 1 silently yields no edges and 0 accepts no-evidence pairs; both must fail."""
+    monkeypatch.setenv("MERIDIAN_DEPENDENCY_THRESHOLD", value)
+
+    with pytest.raises(ValueError, match="strictly between 0 and 1"):
+        get_settings()
