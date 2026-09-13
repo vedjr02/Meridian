@@ -142,6 +142,16 @@ class Settings:
         return self.processed_dir / "discovery_summary.md"
 
     @property
+    def conformance_cases_csv(self) -> Path:
+        """Per-case token-replay counts and fitness against the stated reference model."""
+        return self.processed_dir / "conformance_cases.csv"
+
+    @property
+    def conformance_summary_json(self) -> Path:
+        """Reference model used, how it was chosen, and log-level conformance aggregates."""
+        return self.processed_dir / "conformance_summary.json"
+
+    @property
     def ingestion_report_json(self) -> Path:
         """Accounting of the last ingestion run: counts kept, excluded and filtered, by reason."""
         return self.processed_dir / "ingestion_report.json"
