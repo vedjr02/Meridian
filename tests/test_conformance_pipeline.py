@@ -60,6 +60,19 @@ def test_outputs_record_what_the_numbers_were_measured_against(settings) -> None
     assert settings.conformance_cases_csv.read_text().count("\n") == 4  # header + 3 cases
 
 
+def test_diagnosis_writes_every_module_b_output(settings) -> None:
+    """One run writes conformance, bottleneck and rework tables plus the report answering all 3."""
+    result = pipeline.run_diagnosis(settings, ReferenceStrategy.MOST_FREQUENT_VARIANT)
+
+    assert all(path.exists() for path in result.outputs.values())
+    assert len(result.outputs) == 6
+    report = settings.diagnostic_report_md.read_text()
+    assert report.startswith("# Process diagnosis — Synthetic loan log")
+    assert "33.3% (1 of 3 cases) do not follow the reference path exactly" in report
+    assert "No case repeats an activity, so rework adds no cycle time." in report
+    assert report == result.report
+
+
 def test_command_requires_an_explicit_reference(settings, monkeypatch, capsys) -> None:
     """Omitting --reference is a usage error: the choice is never made silently."""
     monkeypatch.setattr(pipeline, "get_settings", lambda: settings)
